@@ -20,6 +20,8 @@ type TokenResponse struct {
 	State       string
 }
 
+// A Server handles all HTTP requests relevant to the OAuth2 authorization processes. A Server must not be modified
+// after first use.
 type Server struct {
 	PublicBaseURL            string
 	DeviceCodeRequestStorage DeviceCodeStorage
@@ -32,7 +34,10 @@ type Server struct {
 	EnablePKCE               bool
 }
 
-func (s *Server) HandleAuthorizationRequest(w http.ResponseWriter, r *http.Request) error {
+// HandleAuthorizationCodeRequest previously did something.
+//
+// Deprecated: do not use it now
+func (s *Server) HandleAuthorizationCodeRequest(w http.ResponseWriter, r *http.Request) error {
 	// if the user is not logged in
 	// redirect to login page with redirect back url
 
