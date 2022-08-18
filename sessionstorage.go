@@ -1,8 +1,11 @@
 package goauth
 
+import "time"
+
 type Session struct {
-	ID     string
-	UserID uint
+	ID      string
+	UserID  uint
+	Expires time.Time
 }
 
 type SessionStorage interface {
