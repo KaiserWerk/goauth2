@@ -1,0 +1,14 @@
+<html>
+<body>
+<form method="post">
+    {{ if .Message }}
+        <p>{{ .Message }}</p>
+    {{ end }}
+    <br>
+    The application {{ .ApplicationName }} would like to be authorized by you:<br>
+    User Code: <input type="text" name="_user_code" size="12"><br>
+    <br>
+    <button type="submit">Authorize</button>
+</form>
+</body>
+</html>

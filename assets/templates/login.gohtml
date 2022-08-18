@@ -1,0 +1,13 @@
+<html>
+<body>
+<form method="post">
+    {{ if .Message }}
+    <p>{{ .Message }}</p>
+    {{ end }}
+    Username: <input type="text" name="_username"><br>
+    Password <input type="password" name="_password"><br>
+    <br>
+    <button type="submit">Login</button> <a href="{{ .RedirectCancelURL }}">Cancel</a>
+</form>
+</body>
+</html>
