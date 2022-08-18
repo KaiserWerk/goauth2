@@ -3,6 +3,7 @@ package goauth
 import (
 	"errors"
 	"sync"
+	"time"
 )
 
 var (
@@ -26,7 +27,11 @@ func (ss *MemorySessionStorage) Get(id string) (Session, error) {
 	ss.m.RLock()
 	defer ss.m.RUnlock()
 	if s, found := ss.sessions[id]; found {
-		return s, nil
+		if s.Expires.After(time.Now()) {
+			return s, nil
+		} else {
+			delete(ss.sessions, id)
+		}
 	}
 
 	return Session{}, nil
