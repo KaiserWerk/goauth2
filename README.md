@@ -41,6 +41,7 @@ So far, __goauth2__ supports the following grant types:
  - [ ] Implicit Grant
  - [X] Device Code Grant
  - [ ] Authorization Code Grant
+ - [ ] Authorization Code Grant with Proof Key for Code Exchange
 
 ## Explanations of grant types
 
@@ -77,6 +78,27 @@ The flow schema looks as follows:
     +----------+                                +----------------+
 
 ### Authorization Code Grant
+
+### Authorization Code Grant with Proof Key for Code Exchange
+
+f
+
+                                              +-------------------+
+                                              |   Authz Server    |
+    +--------+                                | +---------------+ |
+    |        |--(A)- Authorization Request ---->|               | |
+    |        |       + t(code_verifier), t_m  | | Authorization | |
+    |        |                                | |    Endpoint   | |
+    |        |<-(B)---- Authorization Code -----|               | |
+    |        |                                | +---------------+ |
+    | Client |                                |                   |
+    |        |                                | +---------------+ |
+    |        |--(C)-- Access Token Request ---->|               | |
+    |        |          + code_verifier       | |    Token      | |
+    |        |                                | |   Endpoint    | |
+    |        |<-(D)------ Access Token ---------|               | |
+    +--------+                                | +---------------+ |
+                                              +-------------------+
 
 ## Examples
 
