@@ -1,4 +1,4 @@
-package goauth
+package types
 
 type GrantType uint8
 

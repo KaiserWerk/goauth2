@@ -1,4 +1,4 @@
-package goauth
+package storage
 
 // A User represents a resource owner.
 type User struct {

@@ -1,4 +1,4 @@
-package goauth
+package storage
 
 // A Client represents an application. A Client's ID must be unique.
 type Client struct {

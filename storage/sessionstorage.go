@@ -1,4 +1,4 @@
-package goauth
+package storage
 
 import "time"
 
