@@ -18,12 +18,12 @@ func main() {
 
 	goauthSrv.Storage.UserStorage.Add(storage.User{
 		ID:       1,
-		Username: "timmy",
+		Username: "tim",
 		Password: "test",
 	})
 	goauthSrv.Storage.ClientStorage.Set(storage.Client{
 		ID:              "my_cool_test_app",
-		Secret:          "",
+		Secret:          "9sfe196sgews8r7413423gf",
 		ApplicationName: "My Cool Test App",
 	})
 
@@ -40,7 +40,7 @@ func main() {
 	})
 
 	router.HandleFunc("/device", func(w http.ResponseWriter, r *http.Request) {
-		if err := goauthSrv.HandleDeviceCodeUserAuthorization(w, r, "/user_login"); err != nil {
+		if err := goauthSrv.HandleDeviceCodeUserAuthorization(w, r); err != nil {
 			fmt.Println("HandleDeviceCodeUserAuthorization:", err.Error())
 		}
 	})
@@ -54,6 +54,12 @@ func main() {
 	router.HandleFunc("/user_login", func(w http.ResponseWriter, r *http.Request) {
 		if err := goauthSrv.HandleUserLogin(w, r); err != nil {
 			fmt.Println("HandleUserLogin:", err.Error())
+		}
+	})
+
+	router.HandleFunc("/user_logout", func(w http.ResponseWriter, r *http.Request) {
+		if err := goauthSrv.HandleUserLogout(w, r); err != nil {
+			fmt.Println("HandleUserLogout:", err.Error())
 		}
 	})
 
