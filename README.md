@@ -81,7 +81,7 @@ The flow schema looks as follows:
 
 ### Authorization Code Grant with Proof Key for Code Exchange
 
-f
+The flow schema looks as follows:
 
                                               +-------------------+
                                               |   Authz Server    |
