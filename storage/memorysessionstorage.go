@@ -34,7 +34,7 @@ func (ss *MemorySessionStorage) Get(id string) (Session, error) {
 		}
 	}
 
-	return Session{}, nil
+	return Session{}, ErrSessionEntryNotFound
 }
 
 func (ss *MemorySessionStorage) Add(session Session) error {
