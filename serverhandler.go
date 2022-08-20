@@ -1,9 +1,8 @@
 package goauth
 
 import (
-	"crypto/rand"
-	"encoding/base64"
 	"encoding/json"
+	"errors"
 	"fmt"
 	"html/template"
 	"io"
@@ -12,6 +11,10 @@ import (
 	"time"
 
 	"github.com/KaiserWerk/goauth2/storage"
+)
+
+var (
+	ErrLoggedIn = errors.New("user is already logged in")
 )
 
 // HandleDeviceCodeAuthorizationRequest handles the request to initiate the device code flow by returning the
@@ -46,11 +49,22 @@ func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *
 
 	// TODO: check if valid client
 
-	userCode := generateCode(6)
+	userCode, err := s.TokenSource.Token(6)
+	if err != nil {
+		http.Error(w, "failed to generate user code", http.StatusInternalServerError)
+		return fmt.Errorf("failed to generate user code: %s", err.Error())
+	}
+
+	deviceCode, err := s.TokenSource.Token(0)
+	if err != nil {
+		http.Error(w, "failed to generate device code", http.StatusInternalServerError)
+		return fmt.Errorf("failed to generate device code: %s", err.Error())
+	}
+
 	req := storage.DeviceCodeRequest{
 		ClientID: values.Get("client_id"),
 		Response: storage.DeviceCodeResponse{
-			DeviceCode:              generateCode(60),
+			DeviceCode:              deviceCode,
 			UserCode:                userCode,
 			VerificationURI:         s.PublicBaseURL + "/device",
 			VerificationURIComplete: s.PublicBaseURL + "/device?user_code=" + userCode,
@@ -71,14 +85,10 @@ func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *
 	return nil
 }
 
-func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *http.Request, loginURL string) error {
-	redirectURL := r.URL.Path
-	if redirectURL != "" {
-		loginURL += "?redirect_uri=" + redirectURL
-	}
+func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *http.Request) error {
 	_, err := s.isLoggedIn(r)
 	if err != nil {
-		http.Redirect(w, r, loginURL, http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("%s?redirect_uri=%s", s.URLs.Login, url.QueryEscape(s.URLs.DeviceCodeUserAuthorization)), http.StatusSeeOther)
 		return nil
 	}
 	// user is certainly logged in from here on
@@ -110,8 +120,14 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 			return fmt.Errorf("failed to find device code request")
 		}
 
+		accessToken, err := s.TokenSource.Token(0)
+		if err != nil {
+			http.Error(w, "failed to generate access token", http.StatusInternalServerError)
+			return fmt.Errorf("failed to generate user code: %s", err.Error())
+		}
+
 		deviceRequest.TokenResponse = storage.DeviceCodeTokenResponse{
-			AccessToken: generateCode(120),
+			AccessToken: accessToken,
 			TokenType:   "Bearer",
 			ExpiresIn:   86400,
 		}
@@ -175,9 +191,15 @@ func (s *Server) HandleDeviceTokenRequest(w http.ResponseWriter, r *http.Request
 }
 
 func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
-	_, err := s.isLoggedIn(r)
-	if err == nil {
-		http.Error(w, "You are already logged in! You can perform authorizations now.", http.StatusOK)
+	w.Header().Set("content-Type", "text/html; charset=utf8")
+	user, err := s.isLoggedIn(r)
+	if err == nil && user.Username != "" {
+		fmt.Fprintln(w, template.HTML("You are already logged in! You can perform authorizations now. <a href='"+s.URLs.Logout+"'>Log out</a>"))
+		return nil
+	}
+
+	if errors.Is(err, ErrLoggedIn) {
+		http.Error(w, "You are already logged in!", http.StatusOK)
 		return nil
 	}
 
@@ -201,9 +223,15 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 			return fmt.Errorf("passwords didn't match")
 		}
 
+		sessionID, err := s.TokenSource.Token(0)
+		if err != nil {
+			http.Error(w, "failed to generate session ID", http.StatusInternalServerError)
+			return fmt.Errorf("failed to generate session ID: %s", err.Error())
+		}
 		session := storage.Session{
-			ID:     generateCode(45),
-			UserID: u.ID,
+			ID:      sessionID,
+			UserID:  u.ID,
+			Expires: time.Now().Add(30 * 24 * time.Hour),
 		}
 		if err := s.Storage.SessionStorage.Add(session); err != nil {
 			http.Error(w, "failed to add session", http.StatusNotFound)
@@ -211,13 +239,21 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		http.SetCookie(w, &http.Cookie{
-			Name:    "GOAUTH_SID",
+			Name:    s.Session.CookieName,
 			Value:   session.ID,
 			Expires: time.Now().Add(30 * 24 * time.Hour),
 		})
 
+		fmt.Fprintln(w, "Login successful!")
+
 		if red := r.URL.Query().Get("redirect_uri"); red != "" {
-			http.Redirect(w, r, red, http.StatusSeeOther)
+			unesc, err := url.QueryUnescape(red)
+			if err != nil {
+				http.Error(w, "invalid redirect URI", http.StatusBadRequest)
+				return fmt.Errorf("invalid redirect URI '%s': %s", red, err.Error())
+			}
+			http.Redirect(w, r, unesc, http.StatusSeeOther)
+			return nil
 		}
 
 		return nil
@@ -227,10 +263,27 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 	return fmt.Errorf("method not allowed")
 }
 
-func (s *Server) isLoggedIn(r *http.Request) (storage.User, error) {
-	sid, err := getSessionIDFromRequest(r)
+func (s *Server) HandleUserLogout(w http.ResponseWriter, r *http.Request) error {
+	w.Header().Set("content-Type", "text/html; charset=utf8")
+	sid, err := s.getSessionID(r)
 	if err != nil || sid == "" {
-		return storage.User{}, nil
+		http.Error(w, "you are not logged in!", http.StatusNotFound)
+		return fmt.Errorf("user is not logged in")
+	}
+
+	if err = s.Storage.SessionStorage.Remove(sid); err != nil {
+		http.Error(w, "failed to remove user session!", http.StatusInternalServerError)
+		return fmt.Errorf("failed to remove user session: %s", err.Error())
+	}
+
+	fmt.Fprintln(w, template.HTML("success! you are logged out. <a href='"+s.URLs.Login+"'>Log in again</a>"))
+	return nil
+}
+
+func (s *Server) isLoggedIn(r *http.Request) (storage.User, error) {
+	sid, err := s.getSessionID(r)
+	if err != nil || sid == "" {
+		return storage.User{}, fmt.Errorf("user is not logged in")
 	}
 
 	session, err := s.Storage.SessionStorage.Get(sid)
@@ -246,8 +299,8 @@ func (s *Server) isLoggedIn(r *http.Request) (storage.User, error) {
 	return user, nil
 }
 
-func getSessionIDFromRequest(r *http.Request) (string, error) {
-	c, err := r.Cookie("GOAUTH_SID")
+func (s *Server) getSessionID(r *http.Request) (string, error) {
+	c, err := r.Cookie(s.Session.CookieName)
 	if err != nil {
 		return "", err
 	}
@@ -255,31 +308,10 @@ func getSessionIDFromRequest(r *http.Request) (string, error) {
 	return c.Value, nil
 }
 
-func generateCode(length int) string {
-	b := make([]byte, length)
-	_, _ = rand.Read(b)
-	return base64.RawStdEncoding.EncodeToString(b)
-}
-
 func executeTemplate(w io.Writer, content []byte, data interface{}) error {
-	tmpl := template.Must(template.New("").Parse(string(content)))
-	if err := tmpl.Execute(w, data); err != nil {
-		return err
+	if content == nil {
+		return fmt.Errorf("template content was nil")
 	}
-
-	return nil
+	tmpl := template.Must(template.New("").Parse(string(content)))
+	return tmpl.Execute(w, data)
 }
-
-//func ExecuteTemplate(w io.Writer, file string, data interface{}) error {
-//	tmplContent, err := GetTemplate(file)
-//	if err != nil {
-//		return err
-//	}
-//
-//	tmpl := template.Must(template.New(file).Parse(string(tmplContent)))
-//	if err = tmpl.Execute(w, data); err != nil {
-//		return err
-//	}
-//
-//	return nil
-//}

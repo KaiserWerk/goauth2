@@ -1,8 +1,9 @@
 package goauth
 
 import (
-	"github.com/KaiserWerk/goauth2/assets"
 	"time"
+
+	"github.com/KaiserWerk/goauth2/assets"
 
 	"github.com/KaiserWerk/goauth2/storage"
 	"github.com/KaiserWerk/goauth2/token"
@@ -42,8 +43,18 @@ type (
 		// IDTokenLength only relates to OpenID Connect
 		IDTokenLength int
 
+		SessionLifetime      time.Duration
 		AccessTokenLifetime  time.Duration
 		RefreshTokenLifetime time.Duration
+	}
+	Session struct {
+		CookieName string
+		HTTPOnly   bool
+	}
+	URLs struct {
+		Login                       string
+		Logout                      string
+		DeviceCodeUserAuthorization string
 	}
 	// A Server handles all HTTP requests relevant to the OAuth2 authorization processes. A Server must not be modified
 	// after first use.
@@ -53,6 +64,8 @@ type (
 		Template      Templates
 		Flags         Flags
 		Policies      Policies
+		Session       Session
+		URLs          URLs
 		TokenSource   token.TokenSource
 		GrantTypes    []types.GrantType
 	}
@@ -74,7 +87,7 @@ type (
 //
 //  • GrantTypes: all implemented grant types are listed here.
 //
-// You should probably alter the PublicBaseURL and add at least one Client and User.
+// You should probably alter the PublicBaseURL and add at least one Client and one User.
 func NewDefaultServer() *Server {
 	return &Server{
 		PublicBaseURL: "http://localhost",
@@ -99,8 +112,18 @@ func NewDefaultServer() *Server {
 			RefreshTokenLength:   80,
 			ClientSecretLength:   75,
 			IDTokenLength:        255,
+			SessionLifetime:      30 * 24 * time.Hour,
 			AccessTokenLifetime:  1 * time.Hour,
 			RefreshTokenLifetime: 24 * time.Hour,
+		},
+		Session: Session{
+			CookieName: "GOAUTH_SID",
+			HTTPOnly:   true,
+		},
+		URLs: URLs{
+			Login:                       "/user_login",
+			Logout:                      "/user_logout",
+			DeviceCodeUserAuthorization: "/device",
 		},
 		TokenSource: token.DefaultTokenSource,
 		GrantTypes:  []types.GrantType{types.DeviceCode, types.AuthorizationCode},
