@@ -92,7 +92,7 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 			Message:         "",
 			ApplicationName: "My Cool Test App",
 		}
-		if err := ExecuteTemplate(w, "device_code.gohtml", data); err != nil {
+		if err := executeTemplate(w, s.Template.DeviceCode, data); err != nil {
 			http.Error(w, "failed to find template", http.StatusNotFound)
 			return fmt.Errorf("failed to find template: %s", err.Error())
 		}
@@ -118,7 +118,7 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 
 		if err := s.Storage.DeviceCodeRequestStorage.Update(deviceRequest); err != nil {
 			http.Error(w, "failed to update device code request", http.StatusNotFound)
-			return fmt.Errorf("failed to update device code request")
+			return fmt.Errorf("failed to update device code request: %s", err.Error())
 		}
 
 		http.Error(w, "success. you can close this window.", http.StatusOK)
@@ -182,7 +182,7 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	if r.Method == http.MethodGet {
-		if err := ExecuteTemplate(w, "login.gohtml", nil); err != nil {
+		if err := executeTemplate(w, s.Template.Login, nil); err != nil {
 			http.Error(w, "failed to find template", http.StatusNotFound)
 			return fmt.Errorf("failed to find template '%s'", "login.gohtml")
 		}
@@ -261,16 +261,25 @@ func generateCode(length int) string {
 	return base64.RawStdEncoding.EncodeToString(b)
 }
 
-func ExecuteTemplate(w io.Writer, file string, data interface{}) error {
-	tmplContent, err := GetTemplate(file)
-	if err != nil {
-		return err
-	}
-
-	tmpl := template.Must(template.New(file).Parse(string(tmplContent)))
-	if err = tmpl.Execute(w, data); err != nil {
+func executeTemplate(w io.Writer, content []byte, data interface{}) error {
+	tmpl := template.Must(template.New("").Parse(string(content)))
+	if err := tmpl.Execute(w, data); err != nil {
 		return err
 	}
 
 	return nil
 }
+
+//func ExecuteTemplate(w io.Writer, file string, data interface{}) error {
+//	tmplContent, err := GetTemplate(file)
+//	if err != nil {
+//		return err
+//	}
+//
+//	tmpl := template.Must(template.New(file).Parse(string(tmplContent)))
+//	if err = tmpl.Execute(w, data); err != nil {
+//		return err
+//	}
+//
+//	return nil
+//}
