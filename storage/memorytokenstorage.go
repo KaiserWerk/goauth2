@@ -22,10 +22,10 @@ func NewMemoryTokenStorage() *MemoryTokenStorage {
 	}
 }
 
-func (ts *MemoryTokenStorage) Get(str string) (Token, error) {
+func (ts *MemoryTokenStorage) Get(at string) (Token, error) {
 	ts.m.RLock()
 	defer ts.m.RUnlock()
-	token, found := ts.tokens[str]
+	token, found := ts.tokens[at]
 	if !found {
 		return Token{}, ErrTokenEntryNotFound
 	}
@@ -36,10 +36,10 @@ func (ts *MemoryTokenStorage) Get(str string) (Token, error) {
 func (ts *MemoryTokenStorage) Set(t Token) error {
 	ts.m.Lock()
 	defer ts.m.Unlock()
-	_, found := ts.tokens[t.Token]
+	_, found := ts.tokens[t.AccessToken]
 	if found {
 		return ErrTokenEntryExists
 	}
-	ts.tokens[t.Token] = t
+	ts.tokens[t.AccessToken] = t
 	return nil
 }

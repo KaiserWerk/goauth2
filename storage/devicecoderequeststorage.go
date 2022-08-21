@@ -3,7 +3,7 @@ package storage
 type DeviceCodeRequest struct {
 	ClientID      string
 	Response      DeviceCodeResponse
-	TokenResponse DeviceCodeTokenResponse
+	TokenResponse Token
 }
 
 type DeviceCodeResponse struct {
@@ -13,12 +13,6 @@ type DeviceCodeResponse struct {
 	VerificationURIComplete string `json:"verification_uri_complete"`
 	ExpiresIn               uint64 `json:"expires_in"`
 	Interval                uint64 `json:"interval"`
-}
-
-type DeviceCodeTokenResponse struct {
-	AccessToken string `json:"access_token"`
-	TokenType   string `json:"token_type"`
-	ExpiresIn   uint   `json:"expires_in"`
 }
 
 type DeviceCodeStorage interface {
