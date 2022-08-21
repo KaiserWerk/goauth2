@@ -143,7 +143,10 @@ applications residing on the same device.
 ### Device Code Grant
 
 It is also called _Device Authorization Grant_ and _Device Flow_.
-The flow schema looks as follows:
+
+The Device Code grant type is used by browser-less or input-constrained devices in the device flow 
+to exchange a previously obtained device code for an access token. It can also be used for
+applications that cannot handle redirects well, like desktop applications.
 
     +----------+                                +----------------+
     |          |>---(A)-- Client Identifier --->|                |
