@@ -24,7 +24,7 @@ __Disclaimer: this is work in progress. That means there will still be breaking 
 
 If you are already an experienced OAuth2 user, you can skip this paragraph.
 
-- Resource Owner: the user who owns a resource, e.g. if Alex has photos stored on a server, Alex is the resource owner.
+- Resource Owner: the user who owns a resource.
 - Client: the app that wants to access a resource.
 - User-Agent: some kind of client able to execute HTTP requests, but the actual client must not be able to access its storage. Typically a web browser.
 - Authorization Server: the heart of all authorization and authentication flows.
