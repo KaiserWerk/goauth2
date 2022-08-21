@@ -37,7 +37,7 @@ If you are already an experienced OAuth2 user, you can skip this paragraph.
 So far, __goauth2__ supports the following grant types: 
 
  - [ ] Client Credentials Grant
- - [ ] Resource Owner Credentials Grant
+ - [ ] Resource Owner Password Credentials Grant
  - [ ] Implicit Grant
  - [X] Device Code Grant
  - [ ] Authorization Code Grant
@@ -46,8 +46,100 @@ So far, __goauth2__ supports the following grant types:
 ## Explanations of grant types
 
 ### Client Credentials Grant
-### Resource Owner Credentials Grant
+
+The client can request an access token using only its client credentials when the client is 
+requesting access to the protected resources under its control, or those of another resource 
+owner that have been previously arranged with the authorization server. A typical use-case is
+machine-to-machine communication.
+The client credentials grant MUST only be used by confidential clients.
+
+    +---------+                                  +---------------+
+    |         |                                  |               |
+    |         |>--(A)-- Client Authentication -->| Authorization |
+    | Client  |                                  |     Server    |
+    |         |<--(B)---- Access Token ---------<|               |
+    |         |                                  |               |
+    +---------+                                  +---------------+
+
+### Resource Owner Password Credentials Grant
+
+The resource owner password credentials grant type is suitable in cases where the resource owner has a 
+trust relationship with the client, such as the device operating system or a highly privileged 
+application. The authorization server should take special care when enabling this grant type and 
+only allow it when other flows are not viable.
+
+This grant type is suitable for clients capable of obtaining the resource owner’s credentials 
+(username and password, typically using an interactive form). It is also used to migrate existing 
+clients using direct authentication schemes such as HTTP Basic or Digest authentication to OAuth 
+by converting the stored credentials to an access token.
+
+    +----------+
+    | Resource |
+    |  Owner   |
+    |          |
+    +----------+
+         v
+         |    Resource Owner
+         (A) Password Credentials
+         |
+         v
+    +---------+                                  +---------------+
+    |         |>--(B)---- Resource Owner ------->|               |
+    |         |         Password Credentials     | Authorization |
+    | Client  |                                  |     Server    |
+    |         |<--(C)---- Access Token ---------<|               |
+    |         |    (w/ Optional Refresh Token)   |               |
+    +---------+                                  +---------------+
+
 ### Implicit Grant
+
+The implicit grant type is used to obtain access tokens (it does not support the issuance of 
+refresh tokens) and is optimized for public clients known to operate a particular redirection 
+URI. These clients are typically implemented in a browser using a scripting language such as 
+JavaScript.
+
+Unlike the authorization code grant type, in which the client makes separate requests for 
+authorization and for an access token, the client receives the access token as the result 
+of the authorization request.
+
+The implicit grant type does not include client authentication, and relies on the presence 
+of the resource owner and the registration of the redirection URI. Because the access token 
+is encoded into the redirection URI, it may be exposed to the resource owner and other 
+applications residing on the same device.
+
+    +----------+
+    | Resource |
+    |  Owner   |
+    |          |
+    +----------+
+         ^
+         |
+        (B)
+    +----|-----+          Client Identifier     +---------------+
+    |         -+----(A)-- & Redirection URI --->|               |
+    |  User-   |                                | Authorization |
+    |  Agent  -|----(B)-- User authenticates -->|     Server    |
+    |          |                                |               |
+    |          |<---(C)--- Redirection URI ----<|               |
+    |          |          with Access Token     +---------------+
+    |          |            in Fragment
+    |          |                                +---------------+
+    |          |----(D)--- Redirection URI ---->|   Web-Hosted  |
+    |          |          without Fragment      |     Client    |
+    |          |                                |    Resource   |
+    |     (F)  |<---(E)------- Script ---------<|               |
+    |          |                                +---------------+
+    +-|--------+
+      |    |
+     (A)  (G) Access Token
+      |    |
+      ^    v
+    +---------+
+    |         |
+    |  Client |
+    |         |
+    +---------+
+
 ### Device Code Grant
 
 It is also called _Device Authorization Grant_ and _Device Flow_.
@@ -79,6 +171,32 @@ The flow schema looks as follows:
 
 ### Authorization Code Grant
 
+    +----------+
+    | Resource |
+    |   Owner  |
+    |          |
+    +----------+
+    ^
+    |
+    (B)
+    +----|-----+          Client Identifier      +---------------+
+    |         -+----(A)-- & Redirection URI ---->|               |
+    |  User-   |                                 | Authorization |
+    |  Agent  -+----(B)-- User authenticates --->|     Server    |
+    |          |                                 |               |
+    |         -+----(C)-- Authorization Code ---<|               |
+    +-|----|---+                                 +---------------+
+      |    |                                         ^      v
+     (A)  (C)                                        |      |
+      |    |                                         |      |
+      ^    v                                         |      |
+    +---------+                                      |      |
+    |         |>---(D)-- Authorization Code ---------'      |
+    |  Client |          & Redirection URI                  |
+    |         |                                             |
+    |         |<---(E)----- Access Token -------------------'
+    +---------+       (w/ Optional Refresh Token)
+
 ### Authorization Code Grant with Proof Key for Code Exchange
 
 The flow schema looks as follows:
@@ -99,6 +217,27 @@ The flow schema looks as follows:
     |        |<-(D)------ Access Token ---------|               | |
     +--------+                                | +---------------+ |
                                               +-------------------+
+
+### Refresh Token Grant
+
+This is not an actual authorization grant, but a renewal process.
+
+If valid and authorized, the authorization server MAY issue an access token as described in 
+[Section 5.1](https://tools.ietf.org/html/rfc6749#section-5.1) of RFC 6749. 
+
+The authorization server MAY issue a new refresh token, in which case the client MUST discard 
+the old refresh token and replace it with the new refresh token. The authorization server 
+MAY revoke the old refresh token after issuing a new refresh token to the client. If a new 
+refresh token is issued, the refresh token scope MUST be identical to that of the refresh 
+token included by the client in the request.
+
+    +--------+                      +--------------+
+    |        |                      |              |
+    | Client |--(A) Refresh Token ->| Authz Server |
+    |        |                      |              |
+    |        |<--(B) New token(s) --|              |
+    |        |                      |              |
+    +--------+                      +--------------+
 
 ## Examples
 
