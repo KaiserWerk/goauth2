@@ -17,17 +17,103 @@ var (
 	ErrLoggedIn = errors.New("user is already logged in")
 )
 
-func (s *Server) HandleClientCredentialsTokenRequest(w http.ResponseWriter, r *http.Request) error {
+/* Client Credentials Grant */
+
+func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.Request) error {
+	defer r.Body.Close()
 	if r.Method != http.MethodPost {
 		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
 		return fmt.Errorf("expected method '%s', got '%s'", http.MethodPost, r.Method)
 	}
 
+	if ct := r.Header.Get("Content-Type"); ct != "application/x-www-form-urlencoded" {
+		http.Error(w, "wrong content type header", http.StatusBadRequest)
+		return fmt.Errorf("expected content type header to be 'application/x-www-form-urlencoded'. got '%s'", ct)
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		http.Error(w, "error reading request body", http.StatusBadRequest)
+		return fmt.Errorf("failed to read request body: %w", err)
+	}
+
+	values, err := url.ParseQuery(string(body))
+	if err != nil {
+		http.Error(w, "malformed request body", http.StatusBadRequest)
+		return fmt.Errorf("failed to parse request body: %w", err)
+	}
+
+	if !values.Has("grant_type") {
+		http.Error(w, "missing request parameter", http.StatusBadRequest)
+		return fmt.Errorf("missing request parameter '%s'", "grant_type")
+	}
+
+	if gt := values.Get("grant_type"); gt != "client_credentials" {
+		http.Error(w, "invalid grant type parameter", http.StatusBadRequest)
+		return fmt.Errorf("expected grant type '%s', got '%s'", "client_credentials", gt)
+	}
+
+	// check if clientID and clientSecret are in header or body
+	clientID, clientSecret, ok := r.BasicAuth()
+	if !ok {
+		clientID = values.Get("client_id")
+		clientSecret = values.Get("client_secret")
+	}
+
+	if clientID == "" || clientSecret == "" {
+		http.Error(w, "missing client credentials", http.StatusBadRequest)
+		return fmt.Errorf("missing client credentials")
+	}
+
+	client, err := s.Storage.ClientStorage.Get(clientID)
+	if err != nil {
+		http.Error(w, "could not find client", http.StatusNotFound)
+		return fmt.Errorf("failed to get client by ID '%s': %w", clientID, err)
+	}
+
+	if client.Secret != clientSecret {
+		http.Error(w, "incorrect credentials", http.StatusNotFound)
+		return fmt.Errorf("failed to confirm correct password for client by ID '%s'", clientID)
+	}
+
+	accessToken, err := s.TokenSource.Token(s.Policies.AccessTokenLength)
+	if err != nil {
+		http.Error(w, "failed to create access token", http.StatusInternalServerError)
+		return fmt.Errorf("failed to create access token: %w", err)
+	}
+
+	resp := storage.Token{
+		AccessToken: accessToken,
+		ExpiresIn:   uint64(s.Policies.AccessTokenLifetime.Seconds()),
+		TokenType:   "Bearer",
+	}
+
+	if err = s.Storage.TokenStorage.Set(resp); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return fmt.Errorf("failed to store token: %w", err)
+	}
+
+	if err = json.NewEncoder(w).Encode(resp); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return fmt.Errorf("failed to encode JSON: %w", err)
+	}
+
 	return nil
 }
 
-func (s *Server) HandleResourceOwnerCredentialsTokenRequest(w http.ResponseWriter, r *http.Request) error {
+/* Resource Owner Password Credentials Grant */
 
+func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWriter, r *http.Request) error {
+	defer r.Body.Close()
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return fmt.Errorf("expected method '%s', got '%s'", http.MethodPost, r.Method)
+	}
+
+	if ct := r.Header.Get("Content-Type"); ct != "application/x-www-form-urlencoded" {
+		http.Error(w, "wrong content type header", http.StatusBadRequest)
+		return fmt.Errorf("expected content type header to be 'application/x-www-form-urlencoded'. got '%s'", ct)
+	}
 	return nil
 }
 
@@ -35,7 +121,10 @@ func (s *Server) HandleResourceOwnerCredentialsTokenRequest(w http.ResponseWrite
 
 // HandleDeviceCodeAuthorizationRequest handles the request to initiate the device code flow by returning the
 // device code, the user code and a validation URL.
-func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *http.Request) error { // Step 1
+//
+// Step 1 of 3.
+func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *http.Request) error {
+	defer r.Body.Close()
 	if r.Method != http.MethodPost {
 		http.Error(w, "disallowed method", http.StatusBadRequest)
 		return fmt.Errorf("method %s not allowed", r.Method)
@@ -109,6 +198,8 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 	}
 	// user is certainly logged in from here on
 
+	// TODO handle client_id from request
+
 	if r.Method == http.MethodGet {
 		// TODO: set data!
 		data := struct {
@@ -142,7 +233,7 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 			return fmt.Errorf("failed to generate user code: %s", err.Error())
 		}
 
-		deviceRequest.TokenResponse = storage.DeviceCodeTokenResponse{
+		deviceRequest.TokenResponse = storage.Token{
 			AccessToken: accessToken,
 			TokenType:   "Bearer",
 			ExpiresIn:   86400,
