@@ -36,7 +36,7 @@ If you are already an experienced OAuth2 user, you can skip this paragraph.
 
 So far, __goauth2__ supports the following grant types: 
 
- - [ ] Client Credentials Grant
+ - [X] Client Credentials Grant
  - [ ] Resource Owner Password Credentials Grant
  - [ ] Implicit Grant
  - [X] Device Code Grant
