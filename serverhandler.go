@@ -17,6 +17,22 @@ var (
 	ErrLoggedIn = errors.New("user is already logged in")
 )
 
+func (s *Server) HandleClientCredentialsTokenRequest(w http.ResponseWriter, r *http.Request) error {
+	if r.Method != http.MethodPost {
+		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		return fmt.Errorf("expected method '%s', got '%s'", http.MethodPost, r.Method)
+	}
+
+	return nil
+}
+
+func (s *Server) HandleResourceOwnerCredentialsTokenRequest(w http.ResponseWriter, r *http.Request) error {
+
+	return nil
+}
+
+/* Device Code */
+
 // HandleDeviceCodeAuthorizationRequest handles the request to initiate the device code flow by returning the
 // device code, the user code and a validation URL.
 func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *http.Request) error { // Step 1
@@ -190,6 +206,8 @@ func (s *Server) HandleDeviceTokenRequest(w http.ResponseWriter, r *http.Request
 	return nil
 }
 
+/* User authentication */
+
 func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("content-Type", "text/html; charset=utf8")
 	user, err := s.isLoggedIn(r)
@@ -279,6 +297,8 @@ func (s *Server) HandleUserLogout(w http.ResponseWriter, r *http.Request) error 
 	fmt.Fprintln(w, template.HTML("success! you are logged out. <a href='"+s.URLs.Login+"'>Log in again</a>"))
 	return nil
 }
+
+/* helpers */
 
 func (s *Server) isLoggedIn(r *http.Request) (storage.User, error) {
 	sid, err := s.getSessionID(r)
