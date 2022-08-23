@@ -10,6 +10,8 @@ From https://www.rfc-editor.org/rfc/rfc6749
 
 ---
 
+[[TOC]]
+
 ## Introduction
 
 goauth2 is a Go library to create OAuth2 servers. It is made with ease-of-use 
@@ -29,7 +31,7 @@ If you are already an experienced OAuth2 user, you can skip this paragraph.
 - User-Agent: some kind of client able to execute HTTP requests, but the actual client must not be able to access its storage. Typically a web browser.
 - Authorization Server: the heart of all authorization and authentication flows.
 - Resource Server: the server that actually has resource and is willing to supply it on the condition of correct authorization.
-- PKCE: (pronounced like 'pixie'): stands for _Proof Key for Code Exchange_ and is an extension of top of OAuth2 used for public clients using Authorization Code Grant mitigating authorization code interception attacks.
+- PKCE: (pronounced 'pixie'): stands for _Proof Key for Code Exchange_ and is an extension of top of OAuth2 used for public clients using Authorization Code Grant mitigating authorization code interception attacks.
 - OIDC: stands for _OpenID Connect_, an additional identity layer on top of OAuth2 which allows clients to verify the identity of resource owners and to obtain basic profile information about those resource owners.
 
 ## Grant types
@@ -39,7 +41,7 @@ So far, __goauth2__ supports the following grant types:
  - [X] Client Credentials Grant
  - [X] Resource Owner Password Credentials Grant
  - [ ] Implicit Grant
- - [X] Device Code Grant
+ - [X] Device Code Grant (with example code)
  - [ ] Authorization Code Grant
  - [ ] Authorization Code Grant with Proof Key for Code Exchange
 
@@ -232,7 +234,7 @@ The authorization server MAY issue a new refresh token, in which case the client
 the old refresh token and replace it with the new refresh token. The authorization server 
 MAY revoke the old refresh token after issuing a new refresh token to the client. If a new 
 refresh token is issued, the refresh token scope MUST be identical to that of the refresh 
-token included by the client in the request.
+token included by the client in the initial request.
 
     +--------+                      +--------------+
     |        |                      |              |
@@ -244,5 +246,7 @@ token included by the client in the request.
 
 ## Examples
 
-Examples can be found in the `examples` folder. usually examples consist of a server
+Examples can be found in the `examples` folder and consist of a server
 and a client implementation.
+They should be quite self-explanatory considering the abundance of code comments and links
+to the RFCs. If there are still things unclear, please open an issue and I will try to address it.
