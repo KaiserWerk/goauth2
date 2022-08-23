@@ -13,12 +13,38 @@ From https://www.rfc-editor.org/rfc/rfc6749
 ## Introduction
 
 goauth2 is a Go library to create OAuth2 servers. It is made with ease-of-use 
-in mind, allowing fast prototyping by offering sensible defaults, ready-to-use
-implementations and HTML templates required for redirect based flows.
+in mind, allowing fast prototyping by offering useful defaults, ready-to-use in-memory storage
+implementations and basic HTML templates required for redirect based authorization flows.
 
-Nearly every aspect of the code of this OAuth2 implementation is modifiable.
+Nearly every aspect of this OAuth2 implementation is modifiable.
 
 __Disclaimer: this is work in progress. That means there will still be breaking changes!__ 
+
+## The Big Why
+
+> "So, why should I use OAuth at all? I have my username and password, that's all I need. And all of this looks so complicated anyway!"
+> 
+> Ghandi, probably around 2015
+
+
+Well, for confidential clients, which can keep a secret, this is perfectly fine and dandy.
+The main problem OAuth tries to solve is to have a uniform way to handle authorization 
+(and authentication by extension) for public clients like native apps or SPAs, which cannot
+keep a secret.
+
+By using either the Implicit Grant (which was specifically made for Javascript SPAs) or the 
+Authorization Code Grant, the app never even sees your credentials, which adds a whole new layer of
+security.
+
+And classic credentials like username and password will not work out if you want to access a resource
+server; you will need an access token. This access token is basically a password, and as such should
+be treated as confidential data.
+
+But access tokens have a few advantages:
+* They can be revoked (and you don't need to change your password for that)
+* They have a short lifetime (which drastically reduces the time an attack can use it for malicious purposes), but can be refreshed
+* They have a reduced set of permissions, called scopes. Only those scopes YOU authorized the app to
+use can actually be accessed using the access token.
 
 ## Terminology
 
@@ -32,7 +58,7 @@ If you are already an experienced OAuth2 user, you can skip this paragraph.
 - PKCE: (pronounced 'pixie'): stands for _Proof Key for Code Exchange_ and is an extension of top of OAuth2 used for public clients using Authorization Code Grant mitigating authorization code interception attacks.
 - OIDC: stands for _OpenID Connect_, an additional identity layer on top of OAuth2 which allows clients to verify the identity of resource owners and to obtain basic profile information about those resource owners.
 
-## Grant types
+## Grant Types
 
 So far, __goauth2__ supports the following grant types: 
 
@@ -43,7 +69,7 @@ So far, __goauth2__ supports the following grant types:
  - [ ] Authorization Code Grant
  - [ ] Authorization Code Grant with Proof Key for Code Exchange
 
-## Explanations of grant types
+## Explanations of Grant Types
 
 ### Client Credentials Grant
 
@@ -223,7 +249,8 @@ The flow schema looks as follows:
 
 ### Refresh Token Grant
 
-This is not an actual authorization grant, but a renewal process.
+Technically, this is not an actual authorization grant, but a renewal process for previously
+performed authorization.
 
 If valid and authorized, the authorization server MAY issue an access token as described in 
 [Section 5.1](https://tools.ietf.org/html/rfc6749#section-5.1) of RFC 6749. 
