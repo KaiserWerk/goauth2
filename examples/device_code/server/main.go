@@ -14,7 +14,7 @@ import (
 func main() {
 	goauthSrv := goauth.NewDefaultServer()
 	goauthSrv.PublicBaseURL = "http://localhost:7777"
-	goauthSrv.GrantTypes = []types.GrantType{types.DeviceCode}
+	goauthSrv.grantTypes = []types.GrantType{types.DeviceCode}
 
 	goauthSrv.Storage.UserStorage.Add(storage.User{
 		ID:       1,
