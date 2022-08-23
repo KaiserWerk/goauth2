@@ -28,7 +28,7 @@ __Disclaimer: this is work in progress. That means there will still be breaking 
 
 
 Well, for confidential clients, which can keep a secret, this is perfectly fine and dandy.
-The main problem OAuth tries to solve is to have a uniform way to handle authorization 
+The main problem OAuth2 tries to solve is to have a uniform way to handle authorization 
 (and authentication by extension) for public clients like native (mobile) apps or SPAs, which cannot
 keep a secret.
 
