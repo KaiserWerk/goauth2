@@ -10,8 +10,6 @@ From https://www.rfc-editor.org/rfc/rfc6749
 
 ---
 
-[TOC]
-
 ## Introduction
 
 goauth2 is a Go library to create OAuth2 servers. It is made with ease-of-use 
