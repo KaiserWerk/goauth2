@@ -1,6 +1,8 @@
 package goauth
 
 import (
+	"github.com/KaiserWerk/goauth2/usercode"
+	"sync"
 	"time"
 
 	"github.com/KaiserWerk/goauth2/assets"
@@ -26,11 +28,11 @@ type (
 		ImplicitGrant     []byte
 		DeviceCode        []byte
 	}
-	// Flags contains feature flages to enable/disable particular features.
+	// Flags contains feature flags for the authorization code grant to enable/disable particular features.
 	Flags struct {
-		// PKCE is not currently implemented
+		// PKCE = Proof Key for Code Exchange
 		PKCE bool
-		// OIDC (= OpenID Connect) is not currently implemented
+		// OIDC = OpenID Connect
 		OIDC bool
 	}
 	// Policies represents constraints and requirements for proper operation.
@@ -47,27 +49,45 @@ type (
 		AccessTokenLifetime  time.Duration
 		RefreshTokenLifetime time.Duration
 	}
+	// Session contains session and cookie settings
 	Session struct {
 		CookieName string
 		HTTPOnly   bool
+		Secure     bool
 	}
+	// URLs contains paths and/or URLs to the endpoints/routes defined by the caller.
 	URLs struct {
-		Login                       string
-		Logout                      string
-		DeviceCodeUserAuthorization string
+		Login             string
+		Logout            string
+		DeviceCode        string
+		AuthorizationCode string
+		Implicit          string
 	}
 	// A Server handles all HTTP requests relevant to the OAuth2 authorization processes. A Server must not be modified
 	// after first use.
 	Server struct {
+		// PublicBaseURL is the public facing URL containing scheme, hostname and port, if required.
+		// it is used to construct redirect URLs.
 		PublicBaseURL string
-		Storage       Storage
-		Template      Templates
-		Flags         Flags
-		Policies      Policies
-		Session       Session
-		URLs          URLs
-		TokenSource   token.TokenSource
-		GrantTypes    []types.GrantType
+		// Storage contains the necessary storage implementations.
+		Storage Storage
+		// Template contains HTML templates as byte slices used for displaying to the user, e.g. login form.
+		Template Templates
+		// Flags are feature flags meant to enable certain features.
+		Flags Flags
+		// Policies can restrict how certain values have to be restricted, e.g. the length of certain strings or the
+		// validitdy durations.
+		Policies Policies
+		// Session contains session and cookie configuration values.
+		Session Session
+		// URLs contain paths and URLs for internal redirects.
+		URLs URLs
+		// TokenGenerator is a source used to generate tokens.
+		TokenGenerator    token.TokenGenerator
+		UserCodeGenerator usercode.Generator
+
+		grantTypes []types.GrantType
+		m          *sync.RWMutex
 	}
 )
 
@@ -83,9 +103,9 @@ type (
 //
 //  • Policies: sensible lengths and lifetime which ensure a certain degree of security.
 //
-//  • TokenSource: uses a ready-to-use in-memory implementation, namely DefaultTokenSource.
+//  • TokenGenerator: uses a ready-to-use in-memory implementation, namely DefaultTokenGenerator.
 //
-//  • GrantTypes: all implemented grant types are listed here.
+//  • grantTypes: all implemented grant types are listed here.
 //
 // You should probably alter the PublicBaseURL and add at least one Client and one User.
 func NewDefaultServer() *Server {
@@ -119,15 +139,81 @@ func NewDefaultServer() *Server {
 		Session: Session{
 			CookieName: "GOAUTH_SID",
 			HTTPOnly:   true,
+			Secure:     false,
 		},
 		URLs: URLs{
-			Login:                       "/user_login",
-			Logout:                      "/user_logout",
-			DeviceCodeUserAuthorization: "/device",
+			Login:             "/user_login",
+			Logout:            "/user_logout",
+			DeviceCode:        "/device",
+			AuthorizationCode: "/authorize",
+			Implicit:          "/implicit",
 		},
-		TokenSource: token.DefaultTokenSource,
-		GrantTypes:  []types.GrantType{types.DeviceCode, types.AuthorizationCode},
+		TokenGenerator:    token.DefaultTokenGenerator,
+		UserCodeGenerator: usercode.DefaultUCGenerator,
+		grantTypes: []types.GrantType{
+			types.AuthorizationCode,
+			types.DeviceCode,
+			types.Implicit,
+			types.ClientCredentials,
+			types.ResourceOwnerPasswordCredentials,
+		},
+
+		m: new(sync.RWMutex),
 	}
+}
+
+// NewEmptyServer returns a *Server with just the base setup.
+func NewEmptyServer() *Server {
+	return &Server{
+		grantTypes: make([]types.GrantType, 0, 5),
+		m:          new(sync.RWMutex),
+	}
+}
+
+// AddGrantType adds the given grant type to the current list of enabled grant types for the server s.
+// A grant type not listed might not be available, depending on the caller's usage.
+// You can use this call to change the availability of a given grant type while the Server is in use.
+func (s *Server) AddGrantType(gt types.GrantType) {
+	s.m.Lock()
+	defer s.m.Unlock()
+	for _, t := range s.grantTypes {
+		if gt == t {
+			return
+		}
+	}
+	s.grantTypes = append(s.grantTypes, gt)
+}
+
+// RemoveGrantType removes the given grant type from the current list of enabled grant types for the server s.
+// You can use this call to change the availability of a given grant type while the Server is in use.
+func (s *Server) RemoveGrantType(gt types.GrantType) {
+	s.m.Lock()
+	defer s.m.Unlock()
+	for i, t := range s.grantTypes {
+		if gt == t {
+			s.grantTypes[i] = s.grantTypes[len(s.grantTypes)-1]
+			s.grantTypes = s.grantTypes[:len(s.grantTypes)-1]
+		}
+	}
+}
+
+// ResetGrantTypes empties the internal list of enabled grant types.
+func (s *Server) ResetGrantTypes() {
+	s.m.Lock()
+	s.grantTypes = make([]types.GrantType, 0, 5)
+	s.m.Unlock()
+}
+
+func (s *Server) HasGrantType(gt types.GrantType) bool {
+	s.m.RLock()
+	defer s.m.RUnlock()
+	for _, t := range s.grantTypes {
+		if gt == t {
+			return true
+		}
+	}
+
+	return false
 }
 
 // HandleAuthorizationCodeRequest previously did something.

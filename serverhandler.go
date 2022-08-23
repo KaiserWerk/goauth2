@@ -19,6 +19,8 @@ var (
 
 /* Client Credentials Grant */
 
+// HandleClientCredentialsRequest expects a POST request sending client ID and client secret of a client
+// and, in case of correct credentials, exchanges them for an access token.
 func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 	if r.Method != http.MethodPost {
@@ -76,7 +78,7 @@ func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.R
 		return fmt.Errorf("failed to confirm correct password for client by ID '%s'", clientID)
 	}
 
-	accessToken, err := s.TokenSource.Token(s.Policies.AccessTokenLength)
+	accessToken, err := s.TokenGenerator.Token(s.Policies.AccessTokenLength)
 	if err != nil {
 		http.Error(w, "failed to create access token", http.StatusInternalServerError)
 		return fmt.Errorf("failed to create access token: %w", err)
@@ -103,6 +105,8 @@ func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.R
 
 /* Resource Owner Password Credentials Grant */
 
+// HandleResourceOwnerPasswordCredentialsRequest expects a POST request sending username and password of a resource
+// owner and, in case of correct credentials, exchanges them for an access token.
 func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 	if r.Method != http.MethodPost {
@@ -114,15 +118,125 @@ func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWr
 		http.Error(w, "wrong content type header", http.StatusBadRequest)
 		return fmt.Errorf("expected content type header to be 'application/x-www-form-urlencoded'. got '%s'", ct)
 	}
+
+	username, password, ok := r.BasicAuth()
+	if !ok {
+		http.Error(w, "failed authentication", http.StatusUnauthorized)
+		return fmt.Errorf("failed authentication")
+	}
+
+	user, err := s.Storage.UserStorage.GetByUsername(username)
+	if err != nil {
+		http.Error(w, "unknown credentials", http.StatusUnauthorized)
+		return fmt.Errorf("failed to find user '%s': %s", username, err.Error())
+	}
+
+	if user.Password != password {
+		http.Error(w, "unknown credentials", http.StatusUnauthorized)
+		return fmt.Errorf("incorrect password for user '%s'", username)
+	}
+
+	accessToken, err := s.TokenGenerator.Token(0)
+	if err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return fmt.Errorf("failed to generate access token: %s", err.Error())
+	}
+
+	t := storage.Token{
+		AccessToken: accessToken,
+		TokenType:   "Bearer",
+		ExpiresIn:   uint64(s.Policies.AccessTokenLifetime.Seconds()),
+	}
+
+	if err = s.Storage.TokenStorage.Set(t); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return fmt.Errorf("failed to store token: %s", err.Error())
+	}
+
+	if err = json.NewEncoder(w).Encode(t); err != nil {
+		http.Error(w, "internal error", http.StatusInternalServerError)
+		return fmt.Errorf("failed to marshal JSON response: %s", err.Error())
+	}
+
+	return nil
+}
+
+/* Implicit Grant */
+
+func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *http.Request) error {
+	_, err := s.isLoggedIn(r)
+	if err != nil {
+		http.Redirect(w, r, fmt.Sprintf("%s&redirect_back=%s", s.URLs.Login, url.QueryEscape(s.URLs.Implicit)), http.StatusSeeOther)
+		return nil
+	}
+
+	clientID := r.URL.Query().Get("client_id")
+	if clientID == "" {
+		http.Error(w, "missing request parameter", http.StatusBadRequest)
+		return fmt.Errorf("missing URL parameter client_id")
+	}
+
+	client, err := s.Storage.ClientStorage.Get(clientID)
+	if err != nil {
+		http.Error(w, "invalid client ID", http.StatusBadRequest)
+		return fmt.Errorf("the client ID '%s' was not found: %s", clientID, err.Error())
+	}
+
+	scope, err := url.QueryUnescape(r.URL.Query().Get("scope"))
+	if err != nil {
+		http.Error(w, "invalid value for parameter 'scope'", http.StatusBadRequest)
+		return fmt.Errorf("failed to unescape 'scope 'parameter: %s", err.Error())
+	}
+	redirectURL, err := url.QueryUnescape(r.URL.Query().Get("redirect_uri"))
+	if err != nil {
+		http.Error(w, "invalid value for parameter 'redirect_uri'", http.StatusBadRequest)
+		return fmt.Errorf("failed to unescape 'redirect_uri' parameter: %s", err.Error())
+	}
+
+	if _, err = url.ParseRequestURI(redirectURL); err != nil {
+		http.Error(w, "invalid value for parameter 'redirect_uri'", http.StatusBadRequest)
+		return fmt.Errorf("failed to parse 'redirect_uri' parameter as URL: %s", err.Error())
+	}
+
+	found := false
+	for _, e := range client.RedirectURLs {
+		if e == redirectURL {
+			found = true
+			break
+		}
+	}
+
+	if !found {
+		http.Error(w, "callback URL not registered for client", http.StatusBadRequest)
+		return fmt.Errorf("callback URL '%s' is not registered for client '%s'", redirectURL, client)
+	}
+
+	responseType := r.URL.Query().Get("response_type")
+	if responseType != "token" { // only response type 'token' is supported by implicit flow
+		http.Error(w, "invalid value for parameter 'response_type'", http.StatusBadRequest)
+		return fmt.Errorf("invalid value '%s' for parameter 'response_type'", responseType)
+	}
+
+	responseMode := r.URL.Query().Get("response_mode")
+	if responseMode != "fragment" { // only response mode 'fragment' is supported by implicit flow
+		http.Error(w, "invalid value for parameter 'response_mode'", http.StatusBadRequest)
+		return fmt.Errorf("invalid value '%s' for parameter 'response_mode'", responseMode)
+	}
+	state := r.URL.Query().Get("state")
+	if state == "" {
+		http.Error(w, "invalid value for parameter 'state'", http.StatusBadRequest)
+		return fmt.Errorf("invalid empty value for parameter 'state'")
+	}
+
+	// TODO weitermachen
+
 	return nil
 }
 
 /* Device Code */
 
 // HandleDeviceCodeAuthorizationRequest handles the request to initiate the device code flow by returning the
-// device code, the user code and a validation URL.
-//
-// Step 1 of 3.
+// device code, the user code and a validation URL. This is step 1 of 3.
 func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 	if r.Method != http.MethodPost {
@@ -152,15 +266,20 @@ func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *
 		return fmt.Errorf("missing request parameter '%s'", "client_id")
 	}
 
-	// TODO: check if valid client
+	// check if the client ID exists
+	_, err = s.Storage.ClientStorage.Get(values.Get("client_id"))
+	if err != nil {
+		http.Error(w, "invalid client ID", http.StatusBadRequest)
+		return fmt.Errorf("no such client with ID '%s' found: %s", values.Get("client_id"), err.Error())
+	}
 
-	userCode, err := s.TokenSource.Token(6)
+	userCode, err := s.UserCodeGenerator.Generate()
 	if err != nil {
 		http.Error(w, "failed to generate user code", http.StatusInternalServerError)
 		return fmt.Errorf("failed to generate user code: %s", err.Error())
 	}
 
-	deviceCode, err := s.TokenSource.Token(0)
+	deviceCode, err := s.TokenGenerator.Token(0)
 	if err != nil {
 		http.Error(w, "failed to generate device code", http.StatusInternalServerError)
 		return fmt.Errorf("failed to generate device code: %s", err.Error())
@@ -171,10 +290,10 @@ func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *
 		Response: storage.DeviceCodeResponse{
 			DeviceCode:              deviceCode,
 			UserCode:                userCode,
-			VerificationURI:         s.PublicBaseURL + "/device",
-			VerificationURIComplete: s.PublicBaseURL + "/device?user_code=" + userCode,
-			ExpiresIn:               1800,
-			Interval:                5,
+			VerificationURI:         s.PublicBaseURL + s.URLs.DeviceCode,
+			VerificationURIComplete: s.PublicBaseURL + s.URLs.DeviceCode + "?user_code=" + userCode,
+			ExpiresIn:               300, // user has 5 minutes to authorize
+			Interval:                5,   // polling every 5 seconds is okay
 		},
 	}
 	if err := s.Storage.DeviceCodeRequestStorage.Add(req); err != nil {
@@ -190,10 +309,12 @@ func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *
 	return nil
 }
 
+// HandleDeviceCodeUserAuthorization displays a template that allows the user authorize or cancel the request.
+// This is step 2 of 3.
 func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *http.Request) error {
 	_, err := s.isLoggedIn(r)
 	if err != nil {
-		http.Redirect(w, r, fmt.Sprintf("%s?redirect_uri=%s", s.URLs.Login, url.QueryEscape(s.URLs.DeviceCodeUserAuthorization)), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("%s?redirect_back=%s", s.URLs.Login, url.QueryEscape(s.URLs.DeviceCode)), http.StatusSeeOther)
 		return nil
 	}
 	// user is certainly logged in from here on
@@ -227,7 +348,7 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 			return fmt.Errorf("failed to find device code request")
 		}
 
-		accessToken, err := s.TokenSource.Token(0)
+		accessToken, err := s.TokenGenerator.Token(0)
 		if err != nil {
 			http.Error(w, "failed to generate access token", http.StatusInternalServerError)
 			return fmt.Errorf("failed to generate user code: %s", err.Error())
@@ -251,6 +372,7 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 	return nil
 }
 
+// HandleDeviceTokenRequest exchanges a device code for an access token. This is step 3 of 3.
 func (s *Server) HandleDeviceTokenRequest(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
 		http.Error(w, "disallowed method", http.StatusBadRequest)
@@ -299,6 +421,9 @@ func (s *Server) HandleDeviceTokenRequest(w http.ResponseWriter, r *http.Request
 
 /* User authentication */
 
+// HandleUserLogin displays the login template on a GET request and handles the login process on
+// a POST request. On success, HandleUserLogin sets a session cookie and saves the session, linked to
+// the user.
 func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("content-Type", "text/html; charset=utf8")
 	user, err := s.isLoggedIn(r)
@@ -332,7 +457,7 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 			return fmt.Errorf("passwords didn't match")
 		}
 
-		sessionID, err := s.TokenSource.Token(0)
+		sessionID, err := s.TokenGenerator.Token(0)
 		if err != nil {
 			http.Error(w, "failed to generate session ID", http.StatusInternalServerError)
 			return fmt.Errorf("failed to generate session ID: %s", err.Error())
@@ -348,20 +473,23 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 		}
 
 		http.SetCookie(w, &http.Cookie{
-			Name:    s.Session.CookieName,
-			Value:   session.ID,
-			Expires: time.Now().Add(30 * 24 * time.Hour),
+			Name:     s.Session.CookieName,
+			Value:    session.ID,
+			Expires:  time.Now().Add(30 * 24 * time.Hour),
+			SameSite: http.SameSiteStrictMode,
+			Secure:   s.Session.Secure,
 		})
 
 		fmt.Fprintln(w, "Login successful!")
 
-		if red := r.URL.Query().Get("redirect_uri"); red != "" {
-			unesc, err := url.QueryUnescape(red)
+		// if a redirect is available, perform it
+		if red := r.URL.Query().Get("redirect_back"); red != "" {
+			unEsc, err := url.QueryUnescape(red)
 			if err != nil {
 				http.Error(w, "invalid redirect URI", http.StatusBadRequest)
 				return fmt.Errorf("invalid redirect URI '%s': %s", red, err.Error())
 			}
-			http.Redirect(w, r, unesc, http.StatusSeeOther)
+			http.Redirect(w, r, unEsc, http.StatusSeeOther)
 			return nil
 		}
 
@@ -369,9 +497,11 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	w.WriteHeader(http.StatusMethodNotAllowed)
-	return fmt.Errorf("method not allowed")
+	return fmt.Errorf("method not allowed (%s)", r.Method)
 }
 
+// HandleUserLogout reads the session cookie and removes the session linked to the user, effectively logging
+// the user out.
 func (s *Server) HandleUserLogout(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("content-Type", "text/html; charset=utf8")
 	sid, err := s.getSessionID(r)
