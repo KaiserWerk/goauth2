@@ -10,7 +10,7 @@ From https://www.rfc-editor.org/rfc/rfc6749
 
 ---
 
-[[TOC]]
+[TOC]
 
 ## Introduction
 
