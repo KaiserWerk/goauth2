@@ -43,7 +43,7 @@ func (us *MemoryUserStorage) GetByUsername(name string) (User, error) {
 		}
 	}
 
-	return User{}, nil
+	return User{}, ErrUserEntryNotFound
 }
 
 func (us *MemoryUserStorage) Add(user User) error {
