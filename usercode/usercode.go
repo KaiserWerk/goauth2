@@ -12,7 +12,7 @@ type Generator interface {
 
 type UCGenerator struct{}
 
-var DefaultUCGenerator = &UCGenerator{}
+var DefaultUserCodeGenerator = &UCGenerator{}
 
 // Generate generates a user code with length 9 in the form of 'XXXX-XXXX'
 func (ucg *UCGenerator) Generate() (string, error) {
