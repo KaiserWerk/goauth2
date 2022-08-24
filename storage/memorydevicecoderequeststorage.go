@@ -22,21 +22,21 @@ func NewMemoryDeviceCodeRequestStorage() *DeviceCodeRequestStorage {
 	}
 }
 
-func (dars *DeviceCodeRequestStorage) Get(userCode string) (DeviceCodeRequest, error) {
-	dars.m.RLock()
-	defer dars.m.RUnlock()
-	if r, found := dars.requests[userCode]; found {
+func (dcrs *DeviceCodeRequestStorage) Get(userCode string) (DeviceCodeRequest, error) {
+	dcrs.m.RLock()
+	defer dcrs.m.RUnlock()
+	if r, found := dcrs.requests[userCode]; found {
 		return r, nil
 	}
 
 	return DeviceCodeRequest{}, nil
 }
 
-func (dars *DeviceCodeRequestStorage) Find(deviceCode, clientID string) (DeviceCodeRequest, error) {
-	dars.m.RLock()
-	defer dars.m.RUnlock()
+func (dcrs *DeviceCodeRequestStorage) Find(deviceCode, clientID string) (DeviceCodeRequest, error) {
+	dcrs.m.RLock()
+	defer dcrs.m.RUnlock()
 
-	for _, e := range dars.requests {
+	for _, e := range dcrs.requests {
 		if e.ClientID == clientID && e.Response.DeviceCode == deviceCode {
 			return e, nil
 		}
@@ -45,26 +45,26 @@ func (dars *DeviceCodeRequestStorage) Find(deviceCode, clientID string) (DeviceC
 	return DeviceCodeRequest{}, ErrDeviceCodeRequestEntryNotFound
 }
 
-func (dars *DeviceCodeRequestStorage) Add(request DeviceCodeRequest) error {
-	dars.m.Lock()
-	defer dars.m.Unlock()
+func (dcrs *DeviceCodeRequestStorage) Add(request DeviceCodeRequest) error {
+	dcrs.m.Lock()
+	defer dcrs.m.Unlock()
 
-	if _, found := dars.requests[request.Response.UserCode]; found {
+	if _, found := dcrs.requests[request.Response.UserCode]; found {
 		return ErrDeviceCodeRequestEntryExists
 	}
 
-	dars.requests[request.Response.UserCode] = request
+	dcrs.requests[request.Response.UserCode] = request
 	return nil
 }
 
-func (dars *DeviceCodeRequestStorage) Update(request DeviceCodeRequest) error {
-	dars.m.Lock()
-	defer dars.m.Unlock()
+func (dcrs *DeviceCodeRequestStorage) Update(request DeviceCodeRequest) error {
+	dcrs.m.Lock()
+	defer dcrs.m.Unlock()
 
-	if _, found := dars.requests[request.Response.UserCode]; !found {
+	if _, found := dcrs.requests[request.Response.UserCode]; !found {
 		return ErrDeviceCodeRequestEntryNotFound
 	}
 
-	dars.requests[request.Response.UserCode] = request
+	dcrs.requests[request.Response.UserCode] = request
 	return nil
 }
