@@ -15,20 +15,29 @@ import (
 type (
 	// Storage contains the storage implementations required for operations.
 	Storage struct {
+		// DeviceCodeRequestStorage stores requests for the Device Code Grant. Must be set for Device Code Grant.
 		DeviceCodeRequestStorage storage.DeviceCodeStorage
-		SessionStorage           storage.SessionStorage
-		UserStorage              storage.UserStorage
-		ClientStorage            storage.ClientStorage
-		TokenStorage             storage.TokenStorage
+		// SessionStorage stores active user sessions. Required for all redirect-based grant flows.
+		SessionStorage storage.SessionStorage
+		// UserStorage stores user information and credentials. Required for all flows but the Client Credentials Grant flow.
+		UserStorage storage.UserStorage
+		// ClientStorage stores client information. Required for all grant flows.
+		ClientStorage storage.ClientStorage
+		// TokenStorage stores tokens, refresh tokens and related information. Required for all grant flows.
+		TokenStorage storage.TokenStorage
 	}
-	// Templates contains the templates displayed for the user
+	// Templates contains the HTML templates displayed for the user.
 	Templates struct {
-		Login             []byte
+		// Login represents the login HTML template for redirect based flows.
+		Login []byte
+		// AuthorizationCode represents the authorization page shown to the user when authorizing using the Authorization Code Grant.
 		AuthorizationCode []byte
-		ImplicitGrant     []byte
-		DeviceCode        []byte
+		// ImplicitGrant represents the authorization page shown to the user when authorizing using the Implicit Grant.
+		ImplicitGrant []byte
+		// DeviceCode represents the authorization page shown to the user when authorizing using the Device Code Grant.
+		DeviceCode []byte
 	}
-	// Flags contains feature flags for the authorization code grant to enable/disable particular features.
+	// Flags contains feature flags for the Authorization Code Grant to enable/disable particular features.
 	Flags struct {
 		// PKCE = Proof Key for Code Exchange
 		PKCE bool
@@ -37,34 +46,54 @@ type (
 	}
 	// Policies represents constraints and requirements for proper operation.
 	Policies struct {
-		DeviceCodeLength   int
-		UserCodeLength     int
-		AccessTokenLength  int
+		// DeviceCodeLength sets the length in bytes a generated device code for the Device Code Grant should have.
+		DeviceCodeLength int
+		// UserCodeLength sets the length in bytes a generated user code for the Device Code Grant should have.
+		//
+		// Deprecated: use the new UserCodeGenerator field instead.
+		UserCodeLength int
+		// AccessTokenLength sets the length in bytes of a generated access token.
+		AccessTokenLength int
+		// RefreshTokenLength sets the length in bytes of a generated refresh token.
 		RefreshTokenLength int
+		// ClientSecretLength sets the length in bytes of a generated client secret for newly created client.
 		ClientSecretLength int
-		// IDTokenLength only relates to OpenID Connect
+		// IDTokenLength relates to OpenID Connect and sets the length in bytes of a generated ID token.
 		IDTokenLength int
 
-		SessionLifetime      time.Duration
-		AccessTokenLifetime  time.Duration
+		// SessionLifetime sets the maximum lifetime of a user session.
+		SessionLifetime time.Duration
+		// SessionLifetime sets the maximum lifetime of an access token.
+		AccessTokenLifetime time.Duration
+		// RefreshTokenLifetime sets the maximum lifetime of a refresh token.
 		RefreshTokenLifetime time.Duration
 	}
-	// Session contains session and cookie settings
+	// Session contains session and cookie settings.
 	Session struct {
+		// CookieName represents the name of the cookie to be set for storing the session ID.
 		CookieName string
-		HTTPOnly   bool
-		Secure     bool
+		// HTTPOnly specifies whether the session cookie has the HTTPOnly flag set.
+		HTTPOnly bool
+		// Secure specifies whether the session cookie has the Secure flag set (only for HTTPS).
+		Secure bool
 	}
 	// URLs contains paths and/or URLs to the endpoints/routes defined by the caller.
+	// If you only use Client Credentials Grant + Resource Owner Password Credentials Grant, no URLs need to be set, since
+	// these grant flows are not redirect-based.
 	URLs struct {
-		Login             string
-		Logout            string
-		DeviceCode        string
+		// Login is the target URL for the user login page, e.g. /user_login.
+		Login string
+		// Logout is the target URL for the user logout page, e.g. /user_logout.
+		Logout string
+		// DeviceCode is the target URL for the user Device Code user authorization page.
+		DeviceCode string
+		// AuthorizationCode is the target URL for the Authorization Code user authorization page.
 		AuthorizationCode string
-		Implicit          string
+		// Implicit is the target URL for the Implicit Grant user authorization page.
+		Implicit string
 	}
-	// A Server handles all HTTP requests relevant to the OAuth2 authorization processes. A Server must not be modified
-	// after first use.
+	// A Server handles all HTTP requests relevant to the OAuth2 authorization processes. If a Server's exported fields
+	// are modified after first use, the behavior is undefined.
 	Server struct {
 		// PublicBaseURL is the public facing URL containing scheme, hostname and port, if required.
 		// it is used to construct redirect URLs.
@@ -83,7 +112,8 @@ type (
 		// URLs contain paths and URLs for internal redirects.
 		URLs URLs
 		// TokenGenerator is a source used to generate tokens.
-		TokenGenerator    token.TokenGenerator
+		TokenGenerator token.TokenGenerator
+		// UserCodeGenerator is a source used to generate user codes for the device flow
 		UserCodeGenerator usercode.Generator
 
 		grantTypes []types.GrantType
@@ -104,6 +134,8 @@ type (
 //  • Policies: sensible lengths and lifetime which ensure a certain degree of security.
 //
 //  • TokenGenerator: uses a ready-to-use in-memory implementation, namely DefaultTokenGenerator.
+//
+//  • DefaultUserCodeGenerator: uses a ready-to-use in-memory implementation, namely DefaultUserCodeGenerator.
 //
 //  • grantTypes: all implemented grant types are listed here.
 //
@@ -149,7 +181,7 @@ func NewDefaultServer() *Server {
 			Implicit:          "/implicit",
 		},
 		TokenGenerator:    token.DefaultTokenGenerator,
-		UserCodeGenerator: usercode.DefaultUCGenerator,
+		UserCodeGenerator: usercode.DefaultUserCodeGenerator,
 		grantTypes: []types.GrantType{
 			types.AuthorizationCode,
 			types.DeviceCode,

@@ -36,7 +36,7 @@ By using either the Implicit Grant (which was specifically made for Javascript S
 Authorization Code Grant, the app never even sees your credentials, which adds a whole new layer of
 security.
 
-And classic credentials like username and password will not work out if you want to access a resource
+And classic credentials like username and password will typically not work out if you want to access a resource
 server; you will need an access token. This access token is basically a password, and as such should
 be treated as confidential data.
 
