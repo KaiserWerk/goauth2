@@ -252,7 +252,9 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 			return err
 		}
 	} else if r.Method == http.MethodPost {
-
+		_scopesRaw := r.FormValue("_scopes")
+		http.Error(w, _scopesRaw, http.StatusOK)
+		return fmt.Errorf("%+v", _scopesRaw)
 	}
 
 	return nil
