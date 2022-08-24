@@ -8,6 +8,7 @@ import (
 	"io"
 	"net/http"
 	"net/url"
+	"strings"
 	"time"
 
 	"github.com/KaiserWerk/goauth2/storage"
@@ -173,7 +174,7 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 	clientID := r.URL.Query().Get("client_id")
 	if clientID == "" {
 		http.Error(w, "missing request parameter", http.StatusBadRequest)
-		return fmt.Errorf("missing URL parameter client_id")
+		return fmt.Errorf("missing URL parameter 'client_id'")
 	}
 
 	client, err := s.Storage.ClientStorage.Get(clientID)
@@ -182,12 +183,24 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 		return fmt.Errorf("the client ID '%s' was not found: %s", clientID, err.Error())
 	}
 
-	scope, err := url.QueryUnescape(r.URL.Query().Get("scope"))
+	scopeRaw := r.URL.Query().Get("scope")
+	if scopeRaw == "" {
+		http.Error(w, "missing request parameter", http.StatusBadRequest)
+		return fmt.Errorf("missing URL parameter 'scope'")
+	}
+	scope, err := url.QueryUnescape(scopeRaw)
 	if err != nil {
 		http.Error(w, "invalid value for parameter 'scope'", http.StatusBadRequest)
 		return fmt.Errorf("failed to unescape 'scope 'parameter: %s", err.Error())
 	}
-	redirectURL, err := url.QueryUnescape(r.URL.Query().Get("redirect_uri"))
+	scopes := strings.Split(scope, " ")
+
+	redirectURIRaw := r.URL.Query().Get("redirect_uri")
+	if redirectURIRaw == "" {
+		http.Error(w, "missing request parameter", http.StatusBadRequest)
+		return fmt.Errorf("missing URL parameter 'redirect_uri'")
+	}
+	redirectURL, err := url.QueryUnescape(redirectURIRaw)
 	if err != nil {
 		http.Error(w, "invalid value for parameter 'redirect_uri'", http.StatusBadRequest)
 		return fmt.Errorf("failed to unescape 'redirect_uri' parameter: %s", err.Error())
@@ -212,13 +225,13 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 	}
 
 	responseType := r.URL.Query().Get("response_type")
-	if responseType != "token" { // only response type 'token' is supported by implicit flow
+	if responseType != "token" { // only response type 'token' is supported by implicit flow?
 		http.Error(w, "invalid value for parameter 'response_type'", http.StatusBadRequest)
 		return fmt.Errorf("invalid value '%s' for parameter 'response_type'", responseType)
 	}
 
 	responseMode := r.URL.Query().Get("response_mode")
-	if responseMode != "fragment" { // only response mode 'fragment' is supported by implicit flow
+	if responseMode != "fragment" { // only response mode 'fragment' is supported by implicit flow?
 		http.Error(w, "invalid value for parameter 'response_mode'", http.StatusBadRequest)
 		return fmt.Errorf("invalid value '%s' for parameter 'response_mode'", responseMode)
 	}
@@ -228,7 +241,19 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 		return fmt.Errorf("invalid empty value for parameter 'state'")
 	}
 
-	// TODO weitermachen
+	if r.Method == http.MethodGet {
+		data := struct {
+			Scopes []string
+		}{
+			Scopes: scopes,
+		}
+		if err = executeTemplate(w, s.Template.ImplicitGrant, data); err != nil {
+			http.Error(w, "failed to execute template", http.StatusNotFound)
+			return err
+		}
+	} else if r.Method == http.MethodPost {
+
+	}
 
 	return nil
 }
