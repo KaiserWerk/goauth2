@@ -1,0 +1,46 @@
+<!doctype html>
+<html>
+<head>
+
+</head>
+<body>
+
+<p>Initial state: {{ .State }}</p>
+<br>
+access token: <span id="access_token"></span><br> <!-- use this for the API requests -->
+token type: <span id="token_type"></span><br>
+expires in: <span id="expires_in"></span><br>
+scope: <span id="scope"></span><br>
+state: <span id="state"></span><br>
+error: <span id="error"></span><br>
+<br>
+states match: <span id="states_match"></span>
+
+<script>
+console.log("fragment:", window.location.hash);
+let values = parseQuery(window.location.hash);
+console.log("parsed values:", values);
+
+document.getElementById("access_token").textContent = values.access_token;
+document.getElementById("token_type").textContent = values.token_type;
+document.getElementById("expires_in").textContent = values.expires_in;
+document.getElementById("scope").textContent = values.scope;
+document.getElementById("state").textContent = values.state;
+document.getElementById("error").textContent = values.error;
+
+document.getElementById("states_match").textContent = values.state == "{{ .State }}";
+
+function parseQuery(queryString) {
+    var query = {};
+    var pairs = (queryString[0] === '?' ? queryString.substr(1) : queryString).split('&');
+    for (var i = 0; i < pairs.length; i++) {
+        var pair = pairs[i].split('=');
+        pair[0] = pair[0].replace(/#/g, '')
+        query[decodeURIComponent(pair[0])] = decodeURIComponent(pair[1] || '');
+    }
+    return query;
+}
+</script>
+
+</body>
+</html>
