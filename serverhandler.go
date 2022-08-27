@@ -167,7 +167,7 @@ func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWr
 func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *http.Request) error {
 	_, err := s.isLoggedIn(r)
 	if err != nil {
-		http.Redirect(w, r, fmt.Sprintf("%s&redirect_back=%s", s.URLs.Login, url.QueryEscape(s.URLs.Implicit)), http.StatusSeeOther)
+		http.Redirect(w, r, fmt.Sprintf("%s?%s&redirect_back=%s", s.URLs.Login, r.URL.RawQuery, url.QueryEscape(s.URLs.Implicit)), http.StatusSeeOther)
 		return nil
 	}
 
@@ -243,21 +243,41 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 
 	if r.Method == http.MethodGet {
 		data := struct {
-			Scopes []string
+			Scopes          []string
+			CancelURL       string
+			Message         string
+			ApplicationName string
 		}{
-			Scopes: scopes,
+			Scopes:          scopes,
+			CancelURL:       fmt.Sprintf("%s?error=canceled", redirectURL),
+			ApplicationName: client.ApplicationName,
 		}
 		if err = executeTemplate(w, s.Template.ImplicitGrant, data); err != nil {
 			http.Error(w, "failed to execute template", http.StatusNotFound)
 			return err
 		}
 	} else if r.Method == http.MethodPost {
-		_scopesRaw := r.FormValue("_scopes")
-		http.Error(w, _scopesRaw, http.StatusOK)
-		return fmt.Errorf("%+v", _scopesRaw)
+		_ = r.ParseForm()
+		acceptedScopes := r.Form["_accepted_scopes"]
+		for _, as := range acceptedScopes {
+			if !isStringInSlice(scopes, as) {
+				http.Error(w, "failed to execute template", http.StatusNotFound)
+				return fmt.Errorf("scope '%s' was not in the initial scope", as)
+			}
+		}
 	}
 
 	return nil
+}
+
+func isStringInSlice(sl []string, s string) bool {
+	for _, e := range sl {
+		if e == s {
+			return true
+		}
+	}
+
+	return false
 }
 
 /* Device Code */
@@ -507,16 +527,20 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 			Secure:   s.Session.Secure,
 		})
 
-		fmt.Fprintln(w, "Login successful!")
+		//fmt.Fprintln(w, "Login successful!")
 
 		// if a redirect is available, perform it
 		if red := r.URL.Query().Get("redirect_back"); red != "" {
 			unEsc, err := url.QueryUnescape(red)
 			if err != nil {
 				http.Error(w, "invalid redirect URI", http.StatusBadRequest)
-				return fmt.Errorf("invalid redirect URI '%s': %s", red, err.Error())
+				return fmt.Errorf("invalid redirect back URI '%s': %s", red, err.Error())
 			}
-			http.Redirect(w, r, unEsc, http.StatusSeeOther)
+			q := r.URL.Query()
+			q.Del("redirect_back")
+			redir := fmt.Sprintf("%s?%s", unEsc, q.Encode())
+			//fmt.Fprintln(w, "redirecting to "+redir)
+			http.Redirect(w, r, redir, http.StatusFound)
 			return nil
 		}
 
@@ -524,7 +548,7 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 	}
 
 	w.WriteHeader(http.StatusMethodNotAllowed)
-	return fmt.Errorf("method not allowed (%s)", r.Method)
+	return fmt.Errorf("method '%s' not allowed", r.Method)
 }
 
 // HandleUserLogout reads the session cookie and removes the session linked to the user, effectively logging
