@@ -36,12 +36,16 @@ type (
 		ImplicitGrant []byte
 		// DeviceCode represents the authorization page shown to the user when authorizing using the Device Code Grant.
 		DeviceCode []byte
+		//Though PKCE is based on the Authorization Code Grant, you can still choose a different template.
+		PKCE []byte
+		//Though OIDC is based on the Authorization Code Grant, you can still choose a different template.
+		OIDC []byte
 	}
 	// Flags contains feature flags for the Authorization Code Grant to enable/disable particular features.
 	Flags struct {
-		// PKCE = Proof Key for Code Exchange
+		// PKCE = Proof Key for Code Exchange. Used on top of the Authorization Code Grant.
 		PKCE bool
-		// OIDC = OpenID Connect
+		// OIDC = OpenID Connect. If you set this to true, PKCE is enabled regardless of value.
 		OIDC bool
 	}
 	// Policies represents constraints and requirements for proper operation.
@@ -153,7 +157,7 @@ func NewDefaultServer() *Server {
 		Template: Templates{
 			Login:             assets.LoginPageTemplate,
 			AuthorizationCode: assets.AuthorizationCodeTemplate,
-			ImplicitGrant:     assets.ImplicitFlowTemplate,
+			ImplicitGrant:     assets.ImplicitGrantTemplate,
 			DeviceCode:        assets.DeviceCodeTemplate,
 		},
 		Flags: Flags{},
