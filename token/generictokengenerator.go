@@ -15,7 +15,7 @@ func NewGenericTokenGenerator(tokenLen int) *GenericTokenGenerator {
 }
 
 // Token returns cryptographically secure randomly generated string, encoded with base64 raw standard encoding.
-func (tg *GenericTokenGenerator) Token(length int) (string, error) {
+func (tg *GenericTokenGenerator) Generate(length int) (string, error) {
 	if length == 0 {
 		length = tg.tokenLen
 	}
