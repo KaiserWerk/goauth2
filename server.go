@@ -1,7 +1,10 @@
 package goauth
 
 import (
+	"fmt"
 	"github.com/KaiserWerk/goauth2/usercode"
+	"net/http"
+	"net/url"
 	"sync"
 	"time"
 
@@ -12,7 +15,20 @@ import (
 	"github.com/KaiserWerk/goauth2/types"
 )
 
+type RedirectErrorType string
+
+const (
+	InvalidRequest          RedirectErrorType = "invalid_request"
+	UnauthorizedClient      RedirectErrorType = "unauthorized_client"
+	AccessDenied            RedirectErrorType = "access_denied"
+	UnsupportedResponseType RedirectErrorType = "unsupported_response_type"
+	InvalidScope            RedirectErrorType = "invalid_scope"
+	ServerError             RedirectErrorType = "server_error"
+	TemporarilyUnavailable  RedirectErrorType = "temporarily_unavailable"
+)
+
 type (
+
 	// Storage contains the storage implementations required for operations.
 	Storage struct {
 		// DeviceCodeRequestStorage stores requests for the Device Code Grant. Must be set for Device Code Grant.
@@ -120,6 +136,8 @@ type (
 		// UserCodeGenerator is a source used to generate user codes for the device flow
 		UserCodeGenerator usercode.Generator
 
+		ErrorRedirect func(http.ResponseWriter, *http.Request, string, RedirectErrorType, string, string)
+
 		grantTypes []types.GrantType
 		m          *sync.RWMutex
 	}
@@ -186,6 +204,9 @@ func NewDefaultServer() *Server {
 		},
 		TokenGenerator:    token.DefaultTokenGenerator,
 		UserCodeGenerator: usercode.DefaultUserCodeGenerator,
+
+		ErrorRedirect: ErrorRedirectResponse,
+
 		grantTypes: []types.GrantType{
 			types.AuthorizationCode,
 			types.DeviceCode,
@@ -193,7 +214,6 @@ func NewDefaultServer() *Server {
 			types.ClientCredentials,
 			types.ResourceOwnerPasswordCredentials,
 		},
-
 		m: new(sync.RWMutex),
 	}
 }
@@ -201,6 +221,8 @@ func NewDefaultServer() *Server {
 // NewEmptyServer returns a *Server with just the base setup.
 func NewEmptyServer() *Server {
 	return &Server{
+		ErrorRedirect: ErrorRedirectResponse,
+
 		grantTypes: make([]types.GrantType, 0, 5),
 		m:          new(sync.RWMutex),
 	}
@@ -295,3 +317,14 @@ func (s *Server) HasGrantType(gt types.GrantType) bool {
 //
 //	return errors.New("undefined grant type")
 //}
+
+func ErrorRedirectResponse(w http.ResponseWriter, r *http.Request, redirectUrl string, errType RedirectErrorType, errMsg, state string) {
+	values := url.Values{}
+	values.Add("error", string(errType))
+	values.Add("error_description", errMsg)
+	if state != "" {
+		values.Add("state", state)
+	}
+	target := fmt.Sprintf("%s#%s", redirectUrl, values.Encode())
+	http.Redirect(w, r, target, http.StatusSeeOther)
+}
