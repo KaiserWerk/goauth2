@@ -79,7 +79,7 @@ func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.R
 		return fmt.Errorf("failed to confirm correct password for client by ID '%s'", clientID)
 	}
 
-	accessToken, err := s.TokenGenerator.Token(s.Policies.AccessTokenLength)
+	accessToken, err := s.TokenGenerator.Generate(s.Policies.AccessTokenLength)
 	if err != nil {
 		http.Error(w, "failed to create access token", http.StatusInternalServerError)
 		return fmt.Errorf("failed to create access token: %w", err)
@@ -137,7 +137,7 @@ func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWr
 		return fmt.Errorf("incorrect password for user '%s'", username)
 	}
 
-	accessToken, err := s.TokenGenerator.Token(0)
+	accessToken, err := s.TokenGenerator.Generate(0)
 	if err != nil {
 		http.Error(w, "internal error", http.StatusInternalServerError)
 		return fmt.Errorf("failed to generate access token: %s", err.Error())
@@ -171,46 +171,30 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 		return nil
 	}
 
+	// get the client ID
 	clientID := r.URL.Query().Get("client_id")
 	if clientID == "" {
-		http.Error(w, "missing request parameter", http.StatusBadRequest)
+		http.Error(w, "missing required request parameter client_id", http.StatusBadRequest)
 		return fmt.Errorf("missing URL parameter 'client_id'")
 	}
 
+	// check if a client with this ID exists and if so, fetch it
 	client, err := s.Storage.ClientStorage.Get(clientID)
 	if err != nil {
 		http.Error(w, "invalid client ID", http.StatusBadRequest)
 		return fmt.Errorf("the client ID '%s' was not found: %s", clientID, err.Error())
 	}
 
-	scopeRaw := r.URL.Query().Get("scope")
-	if scopeRaw == "" {
-		http.Error(w, "missing request parameter", http.StatusBadRequest)
-		return fmt.Errorf("missing URL parameter 'scope'")
-	}
-	scope, err := url.QueryUnescape(scopeRaw)
-	if err != nil {
-		http.Error(w, "invalid value for parameter 'scope'", http.StatusBadRequest)
-		return fmt.Errorf("failed to unescape 'scope 'parameter: %s", err.Error())
-	}
-	scopes := strings.Split(scope, " ")
-
+	// check if a redirect URL is set and valid
 	redirectURIRaw := r.URL.Query().Get("redirect_uri")
-	if redirectURIRaw == "" {
-		http.Error(w, "missing request parameter", http.StatusBadRequest)
-		return fmt.Errorf("missing URL parameter 'redirect_uri'")
-	}
-	redirectURL, err := url.QueryUnescape(redirectURIRaw)
-	if err != nil {
-		http.Error(w, "invalid value for parameter 'redirect_uri'", http.StatusBadRequest)
-		return fmt.Errorf("failed to unescape 'redirect_uri' parameter: %s", err.Error())
+	redirectURL, err2 := url.QueryUnescape(redirectURIRaw)
+	_, err3 := url.ParseRequestURI(redirectURL)
+	if redirectURIRaw == "" || err2 != nil || err3 != nil {
+		http.Error(w, "missing or invalid parameter redirect_uri", http.StatusBadRequest)
+		return fmt.Errorf("failed to parse 'redirect_uri' parameter as URL: missing: %t / err: %v / err %v", redirectURIRaw == "", err2, err3)
 	}
 
-	if _, err = url.ParseRequestURI(redirectURL); err != nil {
-		http.Error(w, "invalid value for parameter 'redirect_uri'", http.StatusBadRequest)
-		return fmt.Errorf("failed to parse 'redirect_uri' parameter as URL: %s", err.Error())
-	}
-
+	// check if the redirect URL is in the client's list of registered redirect URLs
 	found := false
 	for _, e := range client.RedirectURLs {
 		if e == redirectURL {
@@ -218,29 +202,48 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 			break
 		}
 	}
-
 	if !found {
-		http.Error(w, "callback URL not registered for client", http.StatusBadRequest)
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "callback URL not registered for client", "")
 		return fmt.Errorf("callback URL '%s' is not registered for client '%s'", redirectURL, client)
 	}
 
-	responseType := r.URL.Query().Get("response_type")
-	if responseType != "token" { // only response type 'token' is supported by implicit flow?
-		http.Error(w, "invalid value for parameter 'response_type'", http.StatusBadRequest)
-		return fmt.Errorf("invalid value '%s' for parameter 'response_type'", responseType)
-	}
-
-	responseMode := r.URL.Query().Get("response_mode")
-	if responseMode != "fragment" { // only response mode 'fragment' is supported by implicit flow?
-		http.Error(w, "invalid value for parameter 'response_mode'", http.StatusBadRequest)
-		return fmt.Errorf("invalid value '%s' for parameter 'response_mode'", responseMode)
-	}
+	// get the state parameter and check for emptiness
 	state := r.URL.Query().Get("state")
 	if state == "" {
-		http.Error(w, "invalid value for parameter 'state'", http.StatusBadRequest)
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "missing required request parameter state", "")
 		return fmt.Errorf("invalid empty value for parameter 'state'")
 	}
 
+	// get the scope parameter and check for emptiness
+	scopeRaw := r.URL.Query().Get("scope")
+	if scopeRaw == "" {
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "missing required request parameter scope", state)
+		return fmt.Errorf("missing URL parameter 'scope'")
+	}
+
+	// parse the scope values
+	scope, err := url.QueryUnescape(scopeRaw)
+	if err != nil {
+		http.Error(w, "invalid value for parameter 'scope'", http.StatusBadRequest)
+		return fmt.Errorf("failed to unescape 'scope 'parameter: %s", err.Error())
+	}
+	scopes := strings.Split(scope, " ")
+
+	// check the response type (currently only token)
+	responseType := r.URL.Query().Get("response_type")
+	if responseType != "token" { // only response type 'token' is supported by implicit flow?
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter response_type missing or invalid", state)
+		return fmt.Errorf("invalid value '%s' for parameter 'response_type'", responseType)
+	}
+
+	// check the response type (currently only fragment)
+	responseMode := r.URL.Query().Get("response_mode")
+	if responseMode != "fragment" { // only response mode 'fragment' is supported by implicit flow?
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter response_mode missing or invalid", state)
+		return fmt.Errorf("invalid value '%s' for parameter 'response_mode'", responseMode)
+	}
+
+	// determine whether to present or process the form
 	if r.Method == http.MethodGet {
 		data := struct {
 			Scopes          []string
@@ -253,18 +256,65 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 			ApplicationName: client.ApplicationName,
 		}
 		if err = executeTemplate(w, s.Template.ImplicitGrant, data); err != nil {
-			http.Error(w, "failed to execute template", http.StatusNotFound)
-			return err
+			s.ErrorRedirect(w, r, redirectURL, ServerError, "template error", state)
+			return fmt.Errorf("template error: %w", err)
 		}
 	} else if r.Method == http.MethodPost {
 		_ = r.ParseForm()
-		acceptedScopes := r.Form["_accepted_scopes"]
+
+		// compare the accepted scopes with the initially requested scopes. has to be fewer or equal number and
+		// accepted values must be in initial scope
+		var acceptedScopes storage.Scope = r.Form["_accepted_scopes"]
 		for _, as := range acceptedScopes {
 			if !isStringInSlice(scopes, as) {
-				http.Error(w, "failed to execute template", http.StatusNotFound)
+				s.ErrorRedirect(w, r, redirectURL, InvalidScope, "user authorized scopes did not match initial scopes", state)
 				return fmt.Errorf("scope '%s' was not in the initial scope", as)
 			}
 		}
+
+		// generate access token
+		accessToken, err := s.TokenGenerator.Generate(0)
+		if err != nil {
+			values := url.Values{}
+			values.Add("error", "server_error")
+			values.Add("error_description", "internal error")
+			values.Add("state", state)
+			target := fmt.Sprintf("%s#%s", redirectURL, values.Encode())
+			http.Redirect(w, r, target, http.StatusSeeOther)
+			return fmt.Errorf("failed to generate access token: %s", err.Error())
+		}
+
+		// declare the token info
+		token := storage.Token{
+			ClientID:    clientID,
+			AccessToken: accessToken,
+			TokenType:   "Bearer",
+			ExpiresIn:   uint64(s.Policies.AccessTokenLifetime.Seconds()),
+			Scope:       acceptedScopes,
+			State:       state,
+		}
+
+		// store the token info
+		if err = s.Storage.TokenStorage.Set(token); err != nil {
+			values := url.Values{}
+			values.Add("error", "server_error")
+			values.Add("error_description", "internal error")
+			values.Add("state", state)
+			target := fmt.Sprintf("%s#%s", redirectURL, values.Encode())
+			http.Redirect(w, r, target, http.StatusSeeOther)
+			return fmt.Errorf("failed to generate refesh token: %s", err.Error())
+		}
+
+		// redirect back with the response in the URL fragment
+		values := url.Values{}
+		values.Add("access_token", token.AccessToken)
+		values.Add("token_type", token.TokenType)
+		values.Add("expires_in", fmt.Sprintf("%d", token.ExpiresIn))
+		values.Add("scope", token.Scope.String())
+		values.Add("state", token.State)
+
+		target := fmt.Sprintf("%s#%s", redirectURL, values.Encode())
+		http.Redirect(w, r, target, http.StatusFound)
 	}
 
 	return nil
@@ -326,7 +376,7 @@ func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *
 		return fmt.Errorf("failed to generate user code: %s", err.Error())
 	}
 
-	deviceCode, err := s.TokenGenerator.Token(0)
+	deviceCode, err := s.TokenGenerator.Generate(0)
 	if err != nil {
 		http.Error(w, "failed to generate device code", http.StatusInternalServerError)
 		return fmt.Errorf("failed to generate device code: %s", err.Error())
@@ -395,7 +445,7 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 			return fmt.Errorf("failed to find device code request")
 		}
 
-		accessToken, err := s.TokenGenerator.Token(0)
+		accessToken, err := s.TokenGenerator.Generate(0)
 		if err != nil {
 			http.Error(w, "failed to generate access token", http.StatusInternalServerError)
 			return fmt.Errorf("failed to generate user code: %s", err.Error())
@@ -504,7 +554,7 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 			return fmt.Errorf("passwords didn't match")
 		}
 
-		sessionID, err := s.TokenGenerator.Token(0)
+		sessionID, err := s.TokenGenerator.Generate(0)
 		if err != nil {
 			http.Error(w, "failed to generate session ID", http.StatusInternalServerError)
 			return fmt.Errorf("failed to generate session ID: %s", err.Error())
