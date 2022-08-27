@@ -1,1 +1,16 @@
-not implemented
+<html>
+<body>
+<form method="post">
+    {{ if .Message }}
+        <p>{{ .Message }}</p>
+    {{ end }}
+    <br>
+    The application <b>{{ .ApplicationName }}</b> would like to have these permissions:<br>
+    {{ range $i, $e := .Scopes }}
+        <input type="checkbox" name="_accepted_scopes" value="{{ $e }}" id="{{ $i }}"> <label for="{{ $i }}">{{ $e }}</label><br>
+    {{ end }}
+    <br>
+    <button type="submit">Authorize</button> <a href="{{ .CancelURL }}">Cancel</a>
+</form>
+</body>
+</html>
