@@ -22,7 +22,7 @@ type DeviceCodeResponse struct {
 	Interval                uint64 `json:"interval"`
 }
 
-type DeviceCodeTokenResponse struct {
+type Token struct {
 	AccessToken string `json:"access_token"`
 	TokenType   string `json:"token_type"`
 	ExpiresIn   uint   `json:"expires_in"`
@@ -35,7 +35,7 @@ func main() {
 
 	authServerURL := "http://localhost:7777" // this might or might not be hard-coded, maybe you'll use service discovery
 
-	// client ID/Secret should generally not be hard-code but instead be
+	// client ID/Secret should generally not be hard-coded but instead be
 	// taken from a config file, env vars, or similar sources.
 	clientID := "my_cool_test_app"
 	// clientSecret is not needed in this flow
@@ -68,7 +68,7 @@ func main() {
 	fmt.Println("Waiting for authorization...")
 
 	// we can re-use this for the request loop below.
-	var tokenResponse DeviceCodeTokenResponse
+	var tokenResponse Token
 
 	// we can re-use these values as well
 	values = url.Values{}
@@ -115,11 +115,11 @@ func main() {
 			// just wait, everything is going fine
 		case "slow_down":
 			// wait some more
-			fmt.Println("Twe wait some more")
+			fmt.Println("Let's wait some more")
 			time.Sleep(5 * time.Second)
 		case "access_denied":
 			// just exit
-			fmt.Println("The access was denied!")
+			fmt.Println("The access was denied because the user canceled.")
 			os.Exit(-1)
 		case "expired_token":
 			// try again
@@ -127,6 +127,7 @@ func main() {
 			os.Exit(-2)
 		}
 
+		// only fire requests at a set interval
 		time.Sleep(time.Duration(authResponse.Interval) * time.Second)
 	}
 

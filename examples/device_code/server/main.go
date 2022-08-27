@@ -8,13 +8,11 @@ import (
 
 	goauth "github.com/KaiserWerk/goauth2"
 	"github.com/KaiserWerk/goauth2/storage"
-	"github.com/KaiserWerk/goauth2/types"
 )
 
 func main() {
 	goauthSrv := goauth.NewDefaultServer()
 	goauthSrv.PublicBaseURL = "http://localhost:7777"
-	goauthSrv.grantTypes = []types.GrantType{types.DeviceCode}
 
 	goauthSrv.Storage.UserStorage.Add(storage.User{
 		ID:       1,
