@@ -1,1 +1,15 @@
-not implemented
+<html>
+<body>
+<form method="post">
+    <h2>Authorization Code Grant</h2>
+    {{ if .Message }}
+        <br><p>{{ .Message }}</p>
+    {{ end }}
+    <br>
+    The application <b>{{ .ApplicationName }}</b> would like to be authorized by you:<br>
+    <label for="_user_code">User Code:</label><br><input type="text" name="_user_code" id="_user_code" size="12"><br>
+    <br>
+    <button type="submit">Authorize</button>
+</form>
+</body>
+</html>

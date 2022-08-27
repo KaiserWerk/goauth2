@@ -1,12 +1,13 @@
 <html>
 <body>
 <form method="post">
+    <h2>Device Code Grant</h2>
     {{ if .Message }}
-        <p>{{ .Message }}</p>
+        <br><p>{{ .Message }}</p>
     {{ end }}
     <br>
-    The application {{ .ApplicationName }} would like to be authorized by you:<br>
-    User Code: <input type="text" name="_user_code" size="12"><br>
+    The application <b>{{ .ApplicationName }}</b> would like to be authorized by you:<br>
+    <label for="_user_code">User Code:</label><br><input type="text" name="_user_code" id="_user_code" size="12"><br>
     <br>
     <button type="submit">Authorize</button>
 </form>

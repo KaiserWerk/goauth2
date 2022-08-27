@@ -1,8 +1,9 @@
 <html>
 <body>
 <form method="post">
+    <h2>Implicit Grant</h2>
     {{ if .Message }}
-        <p>{{ .Message }}</p>
+        <br><p>{{ .Message }}</p>
     {{ end }}
     <br>
     The application <b>{{ .ApplicationName }}</b> would like to have these permissions:<br>
