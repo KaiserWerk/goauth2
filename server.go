@@ -1,6 +1,7 @@
 package goauth
 
 import (
+	"encoding/json"
 	"fmt"
 	"github.com/KaiserWerk/goauth2/usercode"
 	"net/http"
@@ -15,16 +16,16 @@ import (
 	"github.com/KaiserWerk/goauth2/types"
 )
 
-type RedirectErrorType string
+type ErrorType string
 
 const (
-	InvalidRequest          RedirectErrorType = "invalid_request"
-	UnauthorizedClient      RedirectErrorType = "unauthorized_client"
-	AccessDenied            RedirectErrorType = "access_denied"
-	UnsupportedResponseType RedirectErrorType = "unsupported_response_type"
-	InvalidScope            RedirectErrorType = "invalid_scope"
-	ServerError             RedirectErrorType = "server_error"
-	TemporarilyUnavailable  RedirectErrorType = "temporarily_unavailable"
+	InvalidRequest          ErrorType = "invalid_request"
+	UnauthorizedClient      ErrorType = "unauthorized_client"
+	AccessDenied            ErrorType = "access_denied"
+	UnsupportedResponseType ErrorType = "unsupported_response_type"
+	InvalidScope            ErrorType = "invalid_scope"
+	ServerError             ErrorType = "server_error"
+	TemporarilyUnavailable  ErrorType = "temporarily_unavailable"
 )
 
 type (
@@ -136,7 +137,8 @@ type (
 		// UserCodeGenerator is a source used to generate user codes for the device flow
 		UserCodeGenerator usercode.Generator
 
-		ErrorRedirect func(http.ResponseWriter, *http.Request, string, RedirectErrorType, string, string)
+		ErrorRedirect func(http.ResponseWriter, *http.Request, string, ErrorType, string, string)
+		ErrorResponse func(http.ResponseWriter, int, ErrorType, string) error
 
 		grantTypes []types.GrantType
 		m          *sync.RWMutex
@@ -206,6 +208,7 @@ func NewDefaultServer() *Server {
 		UserCodeGenerator: usercode.DefaultUserCodeGenerator,
 
 		ErrorRedirect: ErrorRedirectResponse,
+		ErrorResponse: ErrorJSONResponse,
 
 		grantTypes: []types.GrantType{
 			types.AuthorizationCode,
@@ -222,6 +225,7 @@ func NewDefaultServer() *Server {
 func NewEmptyServer() *Server {
 	return &Server{
 		ErrorRedirect: ErrorRedirectResponse,
+		ErrorResponse: ErrorJSONResponse,
 
 		grantTypes: make([]types.GrantType, 0, 5),
 		m:          new(sync.RWMutex),
@@ -318,7 +322,7 @@ func (s *Server) HasGrantType(gt types.GrantType) bool {
 //	return errors.New("undefined grant type")
 //}
 
-func ErrorRedirectResponse(w http.ResponseWriter, r *http.Request, redirectUrl string, errType RedirectErrorType, errMsg, state string) {
+func ErrorRedirectResponse(w http.ResponseWriter, r *http.Request, redirectUrl string, errType ErrorType, errMsg, state string) {
 	values := url.Values{}
 	values.Add("error", string(errType))
 	values.Add("error_description", errMsg)
@@ -327,4 +331,15 @@ func ErrorRedirectResponse(w http.ResponseWriter, r *http.Request, redirectUrl s
 	}
 	target := fmt.Sprintf("%s#%s", redirectUrl, values.Encode())
 	http.Redirect(w, r, target, http.StatusSeeOther)
+}
+
+func ErrorJSONResponse(w http.ResponseWriter, code int, errType ErrorType, errMsg string) error {
+	w.WriteHeader(code)
+	w.Header().Set("Content-Type", "application/json; charset=UTF-8")
+	w.Header().Set("Cache-Control", "no-store")
+	w.Header().Set("Pragma", "no-cache")
+	d := map[string]string{"error": string(errType), "error_description": errMsg}
+	e := json.NewEncoder(w)
+	e.SetIndent("", "\t")
+	return e.Encode(d)
 }

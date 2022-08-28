@@ -25,34 +25,34 @@ var (
 func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		_ = s.ErrorResponse(w, http.StatusMethodNotAllowed, InvalidRequest, "method not allowed")
 		return fmt.Errorf("expected method '%s', got '%s'", http.MethodPost, r.Method)
 	}
 
 	if ct := r.Header.Get("Content-Type"); ct != "application/x-www-form-urlencoded" {
-		http.Error(w, "wrong content type header", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "incorrect content type header")
 		return fmt.Errorf("expected content type header to be 'application/x-www-form-urlencoded'. got '%s'", ct)
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "error reading request body", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, ServerError, "error reading request body")
 		return fmt.Errorf("failed to read request body: %w", err)
 	}
 
 	values, err := url.ParseQuery(string(body))
 	if err != nil {
-		http.Error(w, "malformed request body", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "malformed request body")
 		return fmt.Errorf("failed to parse request body: %w", err)
 	}
 
 	if !values.Has("grant_type") {
-		http.Error(w, "missing request parameter", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "request parameter grant_type missing")
 		return fmt.Errorf("missing request parameter '%s'", "grant_type")
 	}
 
 	if gt := values.Get("grant_type"); gt != "client_credentials" {
-		http.Error(w, "invalid grant type parameter", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "request parameter grant_type invalid")
 		return fmt.Errorf("expected grant type '%s', got '%s'", "client_credentials", gt)
 	}
 
@@ -64,24 +64,24 @@ func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.R
 	}
 
 	if clientID == "" || clientSecret == "" {
-		http.Error(w, "missing client credentials", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "missing client credentials")
 		return fmt.Errorf("missing client credentials")
 	}
 
 	client, err := s.Storage.ClientStorage.Get(clientID)
 	if err != nil {
-		http.Error(w, "could not find client", http.StatusNotFound)
+		_ = s.ErrorResponse(w, http.StatusNotFound, UnauthorizedClient, "client not found or unauthorized")
 		return fmt.Errorf("failed to get client by ID '%s': %w", clientID, err)
 	}
 
 	if client.Secret != clientSecret {
-		http.Error(w, "incorrect credentials", http.StatusNotFound)
+		_ = s.ErrorResponse(w, http.StatusNotFound, UnauthorizedClient, "incorrect client credentials")
 		return fmt.Errorf("failed to confirm correct password for client by ID '%s'", clientID)
 	}
 
 	accessToken, err := s.TokenGenerator.Generate(s.Policies.AccessTokenLength)
 	if err != nil {
-		http.Error(w, "failed to create access token", http.StatusInternalServerError)
+		_ = s.ErrorResponse(w, http.StatusInternalServerError, ServerError, "internal error")
 		return fmt.Errorf("failed to create access token: %w", err)
 	}
 
@@ -92,12 +92,12 @@ func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.R
 	}
 
 	if err = s.Storage.TokenStorage.Set(resp); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		_ = s.ErrorResponse(w, http.StatusInternalServerError, ServerError, "internal error")
 		return fmt.Errorf("failed to store token: %w", err)
 	}
 
 	if err = json.NewEncoder(w).Encode(resp); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		_ = s.ErrorResponse(w, http.StatusInternalServerError, ServerError, "internal error")
 		return fmt.Errorf("failed to encode JSON: %w", err)
 	}
 
@@ -111,35 +111,75 @@ func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.R
 func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 	if r.Method != http.MethodPost {
-		http.Error(w, "method not allowed", http.StatusMethodNotAllowed)
+		_ = s.ErrorResponse(w, http.StatusMethodNotAllowed, InvalidRequest, "method not allowed")
 		return fmt.Errorf("expected method '%s', got '%s'", http.MethodPost, r.Method)
 	}
 
 	if ct := r.Header.Get("Content-Type"); ct != "application/x-www-form-urlencoded" {
-		http.Error(w, "wrong content type header", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "incorrect content type header")
 		return fmt.Errorf("expected content type header to be 'application/x-www-form-urlencoded'. got '%s'", ct)
 	}
 
-	username, password, ok := r.BasicAuth()
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "failed to read request body")
+		return err
+	}
+
+	values, err := url.ParseQuery(string(body))
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "failed to parse request body")
+		return err
+	}
+
+	grantType := values.Get("grant_type")
+	if grantType != "password" {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter grant_type missing or invalid")
+		return fmt.Errorf("parameter grant_type missing or invalid")
+	}
+	username := values.Get("username")
+	password := values.Get("password")
+
+	if username == "" || password == "" {
+		_ = s.ErrorResponse(w, http.StatusUnauthorized, AccessDenied, "resource owner password credentials missing or invalid")
+		return fmt.Errorf("resource owner password credentials missing or invalid")
+	}
+
+	// TODO rework
+	clientID, clientSecret, ok := r.BasicAuth()
 	if !ok {
-		http.Error(w, "failed authentication", http.StatusUnauthorized)
-		return fmt.Errorf("failed authentication")
+		_ = s.ErrorResponse(w, http.StatusUnauthorized, UnauthorizedClient, "failed client authentication")
+		return fmt.Errorf("failed client basic authentication")
+	}
+
+	client, err := s.Storage.ClientStorage.Get(clientID)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusUnauthorized, UnauthorizedClient, "failed client authentication")
+		return fmt.Errorf("client with ID '%s' could not be found", clientID)
+	}
+
+	// only require client authentication from confidential clients
+	if client.Secret != "" {
+		if client.Secret != clientSecret {
+			_ = s.ErrorResponse(w, http.StatusUnauthorized, UnauthorizedClient, "failed client authentication")
+			return fmt.Errorf("client secret does not match")
+		}
 	}
 
 	user, err := s.Storage.UserStorage.GetByUsername(username)
 	if err != nil {
-		http.Error(w, "unknown credentials", http.StatusUnauthorized)
-		return fmt.Errorf("failed to find user '%s': %s", username, err.Error())
+		_ = s.ErrorResponse(w, http.StatusBadRequest, AccessDenied, "failed resource owner authentication")
+		return fmt.Errorf("failed to find user with username '%s': %s", username, err.Error())
 	}
 
 	if user.Password != password {
-		http.Error(w, "unknown credentials", http.StatusUnauthorized)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, AccessDenied, "failed resource owner authentication")
 		return fmt.Errorf("incorrect password for user '%s'", username)
 	}
 
 	accessToken, err := s.TokenGenerator.Generate(0)
 	if err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, AccessDenied, "failed resource owner authentication")
 		return fmt.Errorf("failed to generate access token: %s", err.Error())
 	}
 
@@ -150,12 +190,12 @@ func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWr
 	}
 
 	if err = s.Storage.TokenStorage.Set(t); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		_ = s.ErrorResponse(w, http.StatusInternalServerError, ServerError, "internal error")
 		return fmt.Errorf("failed to store token: %s", err.Error())
 	}
 
 	if err = json.NewEncoder(w).Encode(t); err != nil {
-		http.Error(w, "internal error", http.StatusInternalServerError)
+		_ = s.ErrorResponse(w, http.StatusInternalServerError, ServerError, "internal error")
 		return fmt.Errorf("failed to marshal JSON response: %s", err.Error())
 	}
 
@@ -174,14 +214,14 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 	// get the client ID
 	clientID := r.URL.Query().Get("client_id")
 	if clientID == "" {
-		http.Error(w, "missing required request parameter client_id", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "missing required request parameter client_id")
 		return fmt.Errorf("missing URL parameter 'client_id'")
 	}
 
 	// check if a client with this ID exists and if so, fetch it
 	client, err := s.Storage.ClientStorage.Get(clientID)
 	if err != nil {
-		http.Error(w, "invalid client ID", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "invalid client_id")
 		return fmt.Errorf("the client ID '%s' was not found: %s", clientID, err.Error())
 	}
 
@@ -190,7 +230,7 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 	redirectURL, err2 := url.QueryUnescape(redirectURIRaw)
 	_, err3 := url.ParseRequestURI(redirectURL)
 	if redirectURIRaw == "" || err2 != nil || err3 != nil {
-		http.Error(w, "missing or invalid parameter redirect_uri", http.StatusBadRequest)
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "missing or invalid parameter redirect_uri")
 		return fmt.Errorf("failed to parse 'redirect_uri' parameter as URL: missing: %t / err: %v / err %v", redirectURIRaw == "", err2, err3)
 	}
 
