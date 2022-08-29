@@ -44,8 +44,8 @@ func main() {
 	})
 
 	router.HandleFunc("/device_token", func(w http.ResponseWriter, r *http.Request) {
-		if err := goauthSrv.HandleDeviceTokenRequest(w, r); err != nil {
-			fmt.Println("HandleDeviceTokenRequest:", err.Error())
+		if err := goauthSrv.HandleDeviceCodeTokenRequest(w, r); err != nil {
+			fmt.Println("HandleDeviceCodeTokenRequest:", err.Error())
 		}
 	})
 
