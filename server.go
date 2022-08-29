@@ -278,50 +278,6 @@ func (s *Server) HasGrantType(gt types.GrantType) bool {
 	return false
 }
 
-// HandleAuthorizationCodeRequest previously did something.
-//
-// Deprecated: do not use it now
-//func (s *Server) HandleAuthorizationCodeRequest(w http.ResponseWriter, r *http.Request) error {
-//	// if the user is not logged in
-//	// redirect to login page with redirect back url
-//
-//	q := r.URL.Query()
-//	responseType := q.Get("response_type")
-//	grantType := q.Get("authorization_code")
-//	clientID := q.Get("client_id")
-//	redirectURI := q.Get("redirect_uri")
-//	scope := q.Get("scope")
-//	state := q.Get("state")
-//	fmt.Println("response type:", responseType)
-//	fmt.Println("grant type:", grantType)
-//	fmt.Println("client id:", clientID)
-//	fmt.Println("redirect uri:", redirectURI)
-//	fmt.Println("scope:", scope)
-//	fmt.Println("state:", state)
-//	switch {
-//	case responseType == "code":
-//		if r.Method == http.MethodGet {
-//			// write authorize template
-//		} else if r.Method == http.MethodPost {
-//			username := r.FormValue("_username")
-//			password := r.FormValue("_password")
-//			u, err := s.UserStorage.GetByUsername(username)
-//			if err != nil {
-//				http.Error(w, "failed to find user", http.StatusNotFound)
-//				return err
-//			}
-//
-//			if u.Password != password {
-//
-//			}
-//		}
-//	}
-//
-//	http.Error(w, "failed", http.StatusInternalServerError)
-//
-//	return errors.New("undefined grant type")
-//}
-
 func ErrorRedirectResponse(w http.ResponseWriter, r *http.Request, redirectUrl string, errType ErrorType, errMsg, state string) {
 	values := url.Values{}
 	values.Add("error", string(errType))
