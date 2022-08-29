@@ -558,55 +558,55 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 	// check query parameter
 	responseType := r.URL.Query().Get("response_type")
 	if responseType != "code" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter response_type missing or invalid")
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter response_type missing or invalid") // TODO redirect
 		return fmt.Errorf("parameter response_type missing or invalid")
 	}
 
 	clientID := r.URL.Query().Get("client_id")
 	if clientID == "" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter client_id missing")
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter client_id missing") // TODO redirect
 		return fmt.Errorf("parameter client_id missing")
 	}
 
 	client, err := s.Storage.ClientStorage.Get(clientID)
 	if err != nil {
-		_ = s.ErrorResponse(w, http.StatusUnauthorized, UnauthorizedClient, "parameter client_id invalid")
+		_ = s.ErrorResponse(w, http.StatusUnauthorized, UnauthorizedClient, "parameter client_id invalid") // TODO redirect
 		return fmt.Errorf("parameter client_id invalid")
 	}
 
 	redirectURLRaw := r.URL.Query().Get("redirect_uri")
 	if redirectURLRaw != "" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri missing")
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri missing") // TODO redirect
 		return fmt.Errorf("parameter redirect_uri missing")
 	}
 
 	redirectURL, err := url.QueryUnescape(redirectURLRaw)
 	if err != nil {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri has invalid value")
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri has invalid value") // TODO redirect
 		return fmt.Errorf("parameter redirect_uri has invalid value")
 	}
 
 	_, err = url.ParseRequestURI(redirectURL)
 	if err != nil {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri has invalid value")
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri has invalid value") // TODO redirect
 		return fmt.Errorf("parameter redirect_uri has invalid value")
 	}
 
 	state := r.URL.Query().Get("state")
 	if state == "" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter state missing")
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter state missing") // TODO redirect
 		return fmt.Errorf("parameter state missing")
 	}
 
 	scopeRaw := r.URL.Query().Get("scope")
 	if scopeRaw == "" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter scope missing")
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter scope missing") // TODO redirect
 		return fmt.Errorf("parameter scope missing")
 	}
 
 	scope, err := url.QueryUnescape(scopeRaw)
 	if err != nil {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter scope has invalid value")
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter scope has invalid value") // TODO redirect
 		return fmt.Errorf("parameter scope has invalid value")
 	}
 	scopes := strings.Split(scope, " ")
@@ -639,6 +639,10 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 			}
 		}
 
+		t, err := s.TokenGenerator.Generate(0)
+		if err != nil {
+
+		}
 	}
 
 	http.Error(w, "method not allowed", http.StatusNotAcceptable)
