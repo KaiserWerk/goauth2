@@ -360,16 +360,6 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 	return nil
 }
 
-func isStringInSlice(sl []string, s string) bool {
-	for _, e := range sl {
-		if e == s {
-			return true
-		}
-	}
-
-	return false
-}
-
 /* Device Code */
 
 // HandleDeviceCodeAuthorizationRequest handles the request to initiate the device code flow by returning the
@@ -509,8 +499,8 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 	return nil
 }
 
-// HandleDeviceTokenRequest exchanges a device code for an access token. This is step 3 of 3.
-func (s *Server) HandleDeviceTokenRequest(w http.ResponseWriter, r *http.Request) error {
+// HandleDeviceCodeTokenRequest exchanges a device code for an access token. This is step 3 of 3.
+func (s *Server) HandleDeviceCodeTokenRequest(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
 		http.Error(w, "disallowed method", http.StatusBadRequest)
 		return fmt.Errorf("method %s not allowed", r.Method)
@@ -554,6 +544,105 @@ func (s *Server) HandleDeviceTokenRequest(w http.ResponseWriter, r *http.Request
 	}
 
 	return nil
+}
+
+/* Authorization Code Grant */
+
+func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWriter, r *http.Request) error {
+	_, err := s.isLoggedIn(r)
+	if err != nil {
+		http.Redirect(w, r, fmt.Sprintf("%s?%s&redirect_back=%s", s.URLs.Login, r.URL.RawQuery, url.QueryEscape(s.URLs.AuthorizationCode)), http.StatusSeeOther)
+		return nil
+	}
+
+	// check query parameter
+	responseType := r.URL.Query().Get("response_type")
+	if responseType != "code" {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter response_type missing or invalid")
+		return fmt.Errorf("parameter response_type missing or invalid")
+	}
+
+	clientID := r.URL.Query().Get("client_id")
+	if clientID == "" {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter client_id missing")
+		return fmt.Errorf("parameter client_id missing")
+	}
+
+	client, err := s.Storage.ClientStorage.Get(clientID)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusUnauthorized, UnauthorizedClient, "parameter client_id invalid")
+		return fmt.Errorf("parameter client_id invalid")
+	}
+
+	redirectURLRaw := r.URL.Query().Get("redirect_uri")
+	if redirectURLRaw != "" {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri missing")
+		return fmt.Errorf("parameter redirect_uri missing")
+	}
+
+	redirectURL, err := url.QueryUnescape(redirectURLRaw)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri has invalid value")
+		return fmt.Errorf("parameter redirect_uri has invalid value")
+	}
+
+	_, err = url.ParseRequestURI(redirectURL)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri has invalid value")
+		return fmt.Errorf("parameter redirect_uri has invalid value")
+	}
+
+	state := r.URL.Query().Get("state")
+	if state == "" {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter state missing")
+		return fmt.Errorf("parameter state missing")
+	}
+
+	scopeRaw := r.URL.Query().Get("scope")
+	if scopeRaw == "" {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter scope missing")
+		return fmt.Errorf("parameter scope missing")
+	}
+
+	scope, err := url.QueryUnescape(scopeRaw)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter scope has invalid value")
+		return fmt.Errorf("parameter scope has invalid value")
+	}
+	scopes := strings.Split(scope, " ")
+
+	if r.Method == http.MethodGet {
+		data := struct {
+			Scopes          []string
+			CancelURL       string
+			Message         string
+			ApplicationName string
+		}{
+			Scopes:          scopes,
+			CancelURL:       fmt.Sprintf("%s?error=canceled", redirectURL),
+			ApplicationName: client.ApplicationName,
+		}
+		if err = executeTemplate(w, s.Template.AuthorizationCode, data); err != nil {
+			s.ErrorRedirect(w, r, redirectURL, ServerError, "template error", state)
+			return fmt.Errorf("template error: %w", err)
+		}
+	} else if r.Method == http.MethodPost {
+		_ = r.ParseForm()
+
+		// compare the accepted scopes with the initially requested scopes. has to be fewer or equal number and
+		// accepted values must be in initial scope
+		var acceptedScopes storage.Scope = r.Form["_accepted_scopes"]
+		for _, as := range acceptedScopes {
+			if !isStringInSlice(scopes, as) {
+				s.ErrorRedirect(w, r, redirectURL, InvalidScope, "user authorized scopes did not match initial scopes", state)
+				return fmt.Errorf("scope '%s' was not in the initial scope", as)
+			}
+		}
+
+	}
+
+	http.Error(w, "method not allowed", http.StatusNotAcceptable)
+	return fmt.Errorf("method '%s' not allowed", r.Method)
 }
 
 /* User authentication */
@@ -696,4 +785,14 @@ func executeTemplate(w io.Writer, content []byte, data interface{}) error {
 	}
 	tmpl := template.Must(template.New("").Parse(string(content)))
 	return tmpl.Execute(w, data)
+}
+
+func isStringInSlice(sl []string, s string) bool {
+	for _, e := range sl {
+		if e == s {
+			return true
+		}
+	}
+
+	return false
 }
