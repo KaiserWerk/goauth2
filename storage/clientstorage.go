@@ -6,6 +6,7 @@ import "fmt"
 type Client struct { // TODO rework this into an interface
 	ID              string
 	Secret          string
+	Confidential    bool
 	ApplicationName string
 	RedirectURLs    []string
 }
