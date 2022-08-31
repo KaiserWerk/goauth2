@@ -47,6 +47,7 @@ func (s Scope) String() string {
 // A TokenStorage takes care of storing a supplied token associated with the given client ID.
 // A token must be unique.
 type TokenStorage interface {
-	Get(string) (Token, error)
+	FindByCodeChallenge(string) (Token, error)
+	FindByAccessToken(string) (Token, error)
 	Set(Token) error
 }

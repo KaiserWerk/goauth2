@@ -22,7 +22,7 @@ func NewMemoryTokenStorage() *MemoryTokenStorage {
 	}
 }
 
-func (ts *MemoryTokenStorage) Get(at string) (Token, error) {
+func (ts *MemoryTokenStorage) FindByAccessToken(at string) (Token, error) {
 	ts.m.RLock()
 	defer ts.m.RUnlock()
 	token, found := ts.tokens[at]
@@ -31,6 +31,19 @@ func (ts *MemoryTokenStorage) Get(at string) (Token, error) {
 	}
 
 	return token, nil
+}
+
+func (ts *MemoryTokenStorage) FindByCodeChallenge(cc string) (Token, error) {
+	ts.m.RLock()
+	defer ts.m.RUnlock()
+
+	for _, t := range ts.tokens {
+		if t.CodeChallenge == cc {
+			return t, nil
+		}
+	}
+
+	return Token{}, ErrTokenEntryNotFound
 }
 
 func (ts *MemoryTokenStorage) Set(t Token) error {
