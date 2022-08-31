@@ -1,6 +1,8 @@
 package goauth
 
 import (
+	"crypto/sha256"
+	"encoding/base64"
 	"encoding/json"
 	"errors"
 	"fmt"
@@ -548,6 +550,7 @@ func (s *Server) HandleDeviceCodeTokenRequest(w http.ResponseWriter, r *http.Req
 
 /* Authorization Code Grant */
 
+// HandleAuthorizationCodeAuthorizationRequest handles the initial user authorization of scopes and returns a code. This is step 1 of 2.
 func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWriter, r *http.Request) error {
 	_, err := s.isLoggedIn(r)
 	if err != nil {
@@ -555,61 +558,85 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 		return nil
 	}
 
+	var (
+		codeChallenge       = ""
+		codeChallengeMethod = ""
+	)
+
 	// check query parameter
 	responseType := r.URL.Query().Get("response_type")
 	if responseType != "code" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter response_type missing or invalid") // TODO redirect
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter response_type missing or invalid")
 		return fmt.Errorf("parameter response_type missing or invalid")
 	}
 
 	clientID := r.URL.Query().Get("client_id")
 	if clientID == "" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter client_id missing") // TODO redirect
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter client_id missing")
 		return fmt.Errorf("parameter client_id missing")
 	}
 
 	client, err := s.Storage.ClientStorage.Get(clientID)
 	if err != nil {
-		_ = s.ErrorResponse(w, http.StatusUnauthorized, UnauthorizedClient, "parameter client_id invalid") // TODO redirect
+		_ = s.ErrorResponse(w, http.StatusUnauthorized, UnauthorizedClient, "parameter client_id invalid")
 		return fmt.Errorf("parameter client_id invalid")
 	}
 
 	redirectURLRaw := r.URL.Query().Get("redirect_uri")
 	if redirectURLRaw != "" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri missing") // TODO redirect
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri missing")
 		return fmt.Errorf("parameter redirect_uri missing")
 	}
 
 	redirectURL, err := url.QueryUnescape(redirectURLRaw)
 	if err != nil {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri has invalid value") // TODO redirect
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter redirect_uri has invalid value", "")
 		return fmt.Errorf("parameter redirect_uri has invalid value")
 	}
 
 	_, err = url.ParseRequestURI(redirectURL)
 	if err != nil {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri has invalid value") // TODO redirect
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter redirect_uri has invalid value", "")
 		return fmt.Errorf("parameter redirect_uri has invalid value")
 	}
 
 	state := r.URL.Query().Get("state")
 	if state == "" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter state missing") // TODO redirect
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter state missing", state)
 		return fmt.Errorf("parameter state missing")
 	}
 
 	scopeRaw := r.URL.Query().Get("scope")
 	if scopeRaw == "" {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter scope missing") // TODO redirect
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter scope missing", state)
 		return fmt.Errorf("parameter scope missing")
 	}
 
 	scope, err := url.QueryUnescape(scopeRaw)
 	if err != nil {
-		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter scope has invalid value") // TODO redirect
+		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter scope has invalid value", state)
 		return fmt.Errorf("parameter scope has invalid value")
 	}
 	scopes := strings.Split(scope, " ")
+
+	if s.Flags.PKCE {
+		codeChallenge = r.URL.Query().Get("code_challenge")
+		if codeChallenge == "" {
+			s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter code_challenge missing", state)
+			return fmt.Errorf("parameter code_challenge missing")
+		}
+
+		codeChallengeMethod = r.URL.Query().Get("code_challenge_method")
+		if codeChallenge == "" {
+			s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter code_challenge_method missing", state)
+			return fmt.Errorf("parameter code_challenge_method missing")
+		}
+
+		if codeChallengeMethod != "plain" && codeChallengeMethod != "S256" {
+			s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter code_challenge_method invalid", state)
+			return fmt.Errorf("parameter code_challenge_method invalid")
+		}
+	}
 
 	if r.Method == http.MethodGet {
 		data := struct {
@@ -639,14 +666,159 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 			}
 		}
 
-		t, err := s.TokenGenerator.Generate(0)
+		ac, err := s.TokenGenerator.Generate(0)
 		if err != nil {
-
+			s.ErrorRedirect(w, r, redirectURL, ServerError, "internal error", state)
+			return fmt.Errorf("failed to generate authorization code: %w", err)
 		}
+
+		authCodeReq := storage.AuthorizationCodeRequest{
+			ClientID: clientID,
+			Code:     ac,
+			Scope:    acceptedScopes,
+		}
+
+		if s.Flags.PKCE {
+			if codeChallenge == "" {
+				s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "parameter code_challenge missing", state)
+				return fmt.Errorf("parameter code_challenge missing")
+			}
+			authCodeReq.CodeChallenge = codeChallenge
+			authCodeReq.CodeChallengeMethod = codeChallengeMethod
+		}
+
+		if err = s.Storage.AuthorizationCodeRequestStorage.Insert(authCodeReq); err != nil {
+			s.ErrorRedirect(w, r, redirectURL, ServerError, "internal error", state)
+			return fmt.Errorf("failed to insert authorization code request: %w", err)
+		}
+
+		values := url.Values{}
+		values.Add("state", state)
+		values.Add("code", ac)
+
+		target := fmt.Sprintf("%s?%s", redirectURL, values.Encode())
+		http.Redirect(w, r, target, http.StatusOK)
+		return nil
 	}
 
 	http.Error(w, "method not allowed", http.StatusNotAcceptable)
 	return fmt.Errorf("method '%s' not allowed", r.Method)
+}
+
+// HandleAuthorizationCodeTokenRequest exchanges a code for an access token. This is step 2 of 2.
+func (s *Server) HandleAuthorizationCodeTokenRequest(w http.ResponseWriter, r *http.Request) error {
+	defer r.Body.Close()
+	if r.Method != http.MethodPost {
+		_ = s.ErrorResponse(w, http.StatusMethodNotAllowed, InvalidRequest, "method not allowed")
+		return fmt.Errorf("method '%s' not allowed", r.Method)
+	}
+
+	body, err := io.ReadAll(r.Body)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "invalid request body")
+		return fmt.Errorf("could not read request body: %w", err)
+	}
+
+	values, err := url.ParseQuery(string(body))
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "invalid request body")
+		return fmt.Errorf("could not parse request body: %w", err)
+	}
+
+	grantType := values.Get("grant_type")
+	if grantType != "authorization_code" {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter grant_type missing or invalid")
+		return fmt.Errorf("parameter grant_type missing or invalid")
+	}
+
+	code := values.Get("code")
+	if code == "" {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter code missing")
+		return fmt.Errorf("parameter code missing")
+	}
+
+	clientID := values.Get("client_id")
+	var clientSecret string
+	var ok bool
+	if clientID == "" {
+		clientID, clientSecret, ok = r.BasicAuth()
+		if !ok {
+			_ = s.ErrorResponse(w, http.StatusBadRequest, UnauthorizedClient, "client_id or authentication missing")
+			return fmt.Errorf("client_id or authentication missing")
+		}
+	}
+
+	client, err := s.Storage.ClientStorage.Get(clientID)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "client_id missing")
+		return fmt.Errorf("client_id missing")
+	}
+
+	if client.Secret != clientSecret {
+		_ = s.ErrorResponse(w, http.StatusBadRequest, UnauthorizedClient, "client authentication failed")
+		return fmt.Errorf("client secret not matching")
+	}
+
+	at, err := s.TokenGenerator.Generate(0)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusInternalServerError, ServerError, "internal error")
+		return fmt.Errorf("failed to generate access token: %w", err)
+	}
+
+	rt, err := s.TokenGenerator.Generate(80)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusInternalServerError, ServerError, "internal error")
+		return fmt.Errorf("failed to generate refresh token: %w", err)
+	}
+
+	authCodeReq, err := s.Storage.AuthorizationCodeRequestStorage.Pop(code)
+	if err != nil {
+		_ = s.ErrorResponse(w, http.StatusNotFound, InvalidRequest, "unknown code")
+		return fmt.Errorf("no request entry found for code: %w", err)
+	}
+
+	if s.Flags.PKCE {
+		codeVerifier := values.Get("code_verifier")
+		if codeVerifier == "" {
+			_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter code_verifier missing")
+			return fmt.Errorf("parameter code_verifier missing")
+		}
+
+		confirmed := false
+		if authCodeReq.CodeChallengeMethod == "plain" {
+			confirmed = authCodeReq.CodeChallenge == codeVerifier
+		} else if authCodeReq.CodeChallengeMethod == "S256" {
+			h := sha256.New()
+			h.Write([]byte(codeVerifier))
+			confirmed = authCodeReq.CodeChallenge == base64.URLEncoding.EncodeToString(h.Sum(nil)))
+		}
+
+		if !confirmed {
+			_ = s.ErrorResponse(w, http.StatusUnauthorized, InvalidRequest, "failed to verify code challenge")
+			return fmt.Errorf("failed to verify code challenge")
+		}
+	}
+
+	token := storage.Token{
+		ClientID:     clientID,
+		AccessToken:  at,
+		TokenType:    "Bearer",
+		ExpiresIn:    uint64(s.Policies.AccessTokenLifetime.Seconds()),
+		RefreshToken: rt,
+		Scope:        authCodeReq.Scope,
+	}
+
+	if err = s.Storage.TokenStorage.Set(token); err != nil {
+		_ = s.ErrorResponse(w, http.StatusInternalServerError, InvalidRequest, "internal error")
+		return fmt.Errorf("failed to store token")
+	}
+
+	if err = json.NewEncoder(w).Encode(token); err != nil {
+		http.Error(w, "failed to write JSON response", http.StatusInternalServerError)
+		return fmt.Errorf("failed to write JSON response")
+	}
+
+	return nil
 }
 
 /* User authentication */

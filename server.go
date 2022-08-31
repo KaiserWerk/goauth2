@@ -34,6 +34,8 @@ type (
 	Storage struct {
 		// DeviceCodeRequestStorage stores requests for the Device Code Grant. Must be set for Device Code Grant.
 		DeviceCodeRequestStorage storage.DeviceCodeStorage
+		// AuthorizationCodeRequestStorage stores requests for the Authorization Code Grant.
+		AuthorizationCodeRequestStorage storage.AuthorizationCodeRequestStorage
 		// SessionStorage stores active user sessions. Required for all redirect-based grant flows.
 		SessionStorage storage.SessionStorage
 		// UserStorage stores user information and credentials. Required for all flows but the Client Credentials Grant flow.
@@ -168,11 +170,12 @@ func NewDefaultServer() *Server {
 	return &Server{
 		PublicBaseURL: "http://localhost",
 		Storage: Storage{
-			DeviceCodeRequestStorage: storage.NewMemoryDeviceCodeRequestStorage(),
-			SessionStorage:           storage.NewMemorySessionStorage(),
-			UserStorage:              storage.NewMemoryUserStorage(),
-			ClientStorage:            storage.NewMemoryClientStorage(),
-			TokenStorage:             storage.NewMemoryTokenStorage(),
+			DeviceCodeRequestStorage:        storage.NewMemoryDeviceCodeRequestStorage(),
+			AuthorizationCodeRequestStorage: storage.NewMemoryAuthorizationCodeRequestStorage(),
+			SessionStorage:                  storage.NewMemorySessionStorage(),
+			UserStorage:                     storage.NewMemoryUserStorage(),
+			ClientStorage:                   storage.NewMemoryClientStorage(),
+			TokenStorage:                    storage.NewMemoryTokenStorage(),
 		},
 		Template: Templates{
 			Login:             assets.LoginPageTemplate,
