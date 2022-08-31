@@ -65,7 +65,7 @@ So far, __goauth2__ supports the following grant types:
  - [X] Client Credentials Grant
  - [X] Resource Owner Password Credentials Grant
  - [X] Implicit Grant
- - [X] Device Code Grant (with example code)
+ - [X] Device Code Grant
  - [X] Authorization Code Grant
  - [X] Authorization Code Grant with Proof Key for Code Exchange
 
@@ -275,3 +275,12 @@ Examples can be found in the `examples` folder and consist of a server
 and a client implementation.
 They should be quite self-explanatory considering the abundance of code comments and links
 to the RFCs. If there are still things unclear, please open an issue and I will try to address it.
+
+The following examples are currently available:
+
+- [ ] Client Credentials Grant
+- [ ] Resource Owner Password Credentials Grant
+- [X] Implicit Grant
+- [X] Device Code Grant
+- [ ] Authorization Code Grant
+- [ ] Authorization Code Grant with Proof Key for Code Exchange
