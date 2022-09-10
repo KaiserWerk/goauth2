@@ -69,6 +69,8 @@ So far, __goauth2__ supports the following grant types:
  - [X] Authorization Code Grant
  - [X] Authorization Code Grant with Proof Key for Code Exchange
 
+ - [ ] OpenID Connect
+
 ## Explanations of Grant Types
 
 ### Client Credentials Grant
@@ -77,6 +79,7 @@ The client can request an access token using only its client credentials when th
 requesting access to the protected resources under its control, or those of another resource 
 owner that have been previously arranged with the authorization server. A typical use-case is
 machine-to-machine communication.
+
 The client credentials grant MUST only be used by confidential clients.
 
     +---------+                                  +---------------+
@@ -188,26 +191,39 @@ applications that cannot handle redirects well, like desktop applications.
     |          |<---(F)-- Access Token      ---<|     Server     |
     +----------+   (& Optional Refresh Token)   |                |
           v                                     |                |
-          :                                     |                |
+          |                                     |                |
          (C) User Code & Verification URI       |                |
-          :                                     |                |
+          |                                     |                |
           v                                     |                |
     +----------+                                |                |
     | End User |                                |                |
-    |    at    |<---(D)-- End user reviews  --->|                |
+    |    at    |<---(D)-- End user reviews ---->|                |
     |  Browser |          authorization request |                |
     +----------+                                +----------------+
 
 ### Authorization Code Grant
+
+The authorization code is a temporary code that the client will exchange for an access token. The code 
+itself is obtained from the authorization server where the user gets a chance to see what  
+information the client is requesting, and approve or deny the request.
+
+The authorization code flow offers a few benefits over the other grant types. When the user 
+authorizes the application, they are redirected back to the application with a temporary code 
+in the URL. The application exchanges that code for the access token. When the application 
+makes the request for the access token, that request can be authenticated with the client secret, 
+which reduces the risk of an attacker intercepting the authorization code and using it themselves. 
+This also means the access token is never visible to the user or their browser, so it is the 
+most secure way to pass the token back to the application, reducing the risk of the token leaking 
+to someone else.
 
     +----------+
     | Resource |
     |   Owner  |
     |          |
     +----------+
-    ^
-    |
-    (B)
+         ^
+         |
+        (B)
     +----|-----+          Client Identifier      +---------------+
     |         -+----(A)-- & Redirection URI ---->|               |
     |  User-   |                                 | Authorization |
