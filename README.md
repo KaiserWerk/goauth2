@@ -52,24 +52,26 @@ If you are already an experienced OAuth2 user, you can skip this paragraph.
 
 - Resource Owner: the user who owns a resource.
 - Client: the app that wants to access a resource.
+  - Confidential Client: a client that can keep a secret, e.g. server-side web apps
+  - Public Client: a client that cannot keep a secret, e.g. mobile or desktop apps 
 - User-Agent: some kind of client able to execute HTTP requests, but the actual client must not be able to access its storage. Typically a web browser.
 - Authorization Server: the heart of all authorization and authentication flows.
 - Resource Server: the server that actually has resource and is willing to supply it on the condition of correct authorization.
 - PKCE: (pronounced 'pixie'): stands for _Proof Key for Code Exchange_ and is an extension of top of OAuth2 used for public clients using Authorization Code Grant mitigating authorization code interception attacks.
 - OIDC: stands for _OpenID Connect_, an additional identity layer on top of OAuth2 which allows clients to verify the identity of resource owners and to obtain basic profile information about those resource owners.
 
+
 ## Grant Types
 
 So far, __goauth2__ supports the following grant types: 
 
- - [X] Client Credentials Grant
- - [X] Resource Owner Password Credentials Grant
- - [X] Implicit Grant
- - [X] Device Code Grant
- - [X] Authorization Code Grant
- - [X] Authorization Code Grant with Proof Key for Code Exchange
-
- - [ ] OpenID Connect
+- [X] Client Credentials Grant
+- [X] Resource Owner Password Credentials Grant
+- [X] Implicit Grant
+- [X] Device Code Grant
+- [X] Authorization Code Grant
+- [X] Authorization Code Grant with Proof Key for Code Exchange
+- [ ] OpenID Connect
 
 ## Explanations of Grant Types
 
@@ -108,8 +110,8 @@ by converting the stored credentials to an access token.
     |          |
     +----------+
          v
-         |    Resource Owner
-         (A) Password Credentials
+         |  Resource Owner
+        (A) Password Credentials
          |
          v
     +---------+                                  +---------------+
@@ -244,7 +246,21 @@ to someone else.
 
 ### Authorization Code Grant with Proof Key for Code Exchange
 
-The flow schema looks as follows:
+PKCE (described in [RFC 7636](https://www.rfc-editor.org/rfc/rfc7636)) is typically used in conjunction with the Authorization Code Grant.
+
+Before redirecting the user to the authorization server, the client first generates a secret code 
+verifier and challenge.
+
+The code verifier is a cryptographically random string using the characters A-Z, a-z, 0-9, and the 
+punctuation characters -._~ (hyphen, period, underscore, and tilde), between 43 and 128 characters long.
+
+Once the client has generated the code verifier, it uses that to create the code challenge. For 
+devices that can perform a SHA256 hash, the code challenge is a BASE64-URL-encoded string of the 
+SHA256 hash of the code verifier. Otherwise, the same verifier string is used as the challenge.
+
+When exchanging the code for the access token, the code verifier must be sent over as well. The server
+will calculate the BASE64-URL-encoded string of the SHA256 hash of the code verifier and check if the
+result matches the initial code challenge.
 
                                               +-------------------+
                                               |   Authz Server    |
