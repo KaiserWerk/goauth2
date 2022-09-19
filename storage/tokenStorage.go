@@ -20,23 +20,22 @@ type Token struct {
 
 type Scope []string
 
-func (s Scope) MarshalJSON() ([]byte, error) {
+func (s *Scope) MarshalJSON() ([]byte, error) {
 	if s == nil {
 		return nil, fmt.Errorf("scope is nil")
 	}
-	return []byte(url.QueryEscape(strings.Join(s, " "))), nil
+	return []byte(fmt.Sprintf("%q", url.QueryEscape(strings.Join(*s, " ")))), nil
 }
 
-func (s Scope) UnmarshalJSON(d []byte) error {
-	if s == nil {
-		return fmt.Errorf("scope is nil")
-	}
-	unEscaped, err := url.QueryUnescape(string(d))
+func (s *Scope) UnmarshalJSON(d []byte) error {
+	elems := make([]string, 0, 5)
+	err := json.Unmarshal(d, &elems)
 	if err != nil {
 		return err
 	}
 
-	s = append(s, strings.Split(unEscaped, " ")...)
+	*s = elems
+
 	return nil
 }
 
