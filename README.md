@@ -20,32 +20,6 @@ Nearly every aspect of this OAuth2 implementation is modifiable.
 
 __Disclaimer: this is work in progress. That means there will still be breaking changes!__ 
 
-## The Big Why
-
-> "So, why should I use OAuth at all? I have my username and password, that's all I need. And all of this looks so complicated anyway!"
-> 
-> Ghandi, probably around 2015
-
-
-Well, for confidential clients, which can keep a secret, this is perfectly fine and dandy.
-The main problem OAuth2 tries to solve is to have a uniform way to handle authorization 
-(and authentication by extension) for public clients like native (mobile) apps or SPAs, which cannot
-keep a secret.
-
-By using either the Implicit Grant (which was specifically made for Javascript SPAs) or the 
-Authorization Code Grant, the app never even sees your credentials, which adds a whole new layer of
-security.
-
-And classic credentials like username and password will typically not work out if you want to access a resource
-server; you will need an access token. This access token is basically a password, and as such should
-be treated as confidential data.
-
-But access tokens have a few advantages:
-* They can be revoked (and you don't need to change your password for that)
-* They have a short lifetime (which drastically reduces the time an attack can use it for malicious purposes), but can be refreshed
-* They have a reduced set of permissions, called scopes. Only those scopes YOU authorized the app to
-use can actually be accessed using the access token.
-
 ## Terminology
 
 If you are already an experienced OAuth2 user, you can skip this paragraph.
