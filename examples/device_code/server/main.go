@@ -20,9 +20,9 @@ func main() {
 		Password: "test",
 	})
 	goauthSrv.Storage.ClientStorage.Set(storage.Client{
-		ID:              "my_cool_test_app",
-		Secret:          "9sfe196sgews8r7413423gf",
-		ApplicationName: "My Cool Test App",
+		ID:      "my_cool_test_app",
+		Secret:  "9sfe196sgews8r7413423gf",
+		AppName: "My Cool Test App",
 	})
 
 	router := http.NewServeMux()

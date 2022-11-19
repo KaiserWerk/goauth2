@@ -15,10 +15,10 @@ func main() {
 	srv.URLs.Implicit = "/authorize"
 
 	srv.Storage.ClientStorage.Set(storage.Client{
-		ID: "00000",
-		Secret:          "", // Secret is not needed for implicit flow
-		ApplicationName: "My Cool Implicit App",
-		RedirectURLs:    []string{"http://localhost:8888/callback"}, // register allowed redirect URLs
+		ID:           "00000",
+		Secret:       "", // Secret is not needed for implicit flow
+		AppName:      "My Cool Implicit App",
+		RedirectURLs: []string{"http://localhost:8888/callback"}, // register allowed redirect URLs
 	})
 
 	srv.Storage.UserStorage.Add(storage.User{

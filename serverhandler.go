@@ -295,7 +295,7 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 		}{
 			Scopes:          scopes,
 			CancelURL:       fmt.Sprintf("%s?error=canceled", redirectURL),
-			ApplicationName: client.ApplicationName,
+			ApplicationName: client.AppName,
 		}
 		if err = executeTemplate(w, s.Template.ImplicitGrant, data); err != nil {
 			s.ErrorRedirect(w, r, redirectURL, ServerError, "template error", state)
@@ -647,7 +647,7 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 		}{
 			Scopes:          scopes,
 			CancelURL:       fmt.Sprintf("%s?error=canceled", redirectURL),
-			ApplicationName: client.ApplicationName,
+			ApplicationName: client.AppName,
 		}
 		if err = executeTemplate(w, s.Template.AuthorizationCode, data); err != nil {
 			s.ErrorRedirect(w, r, redirectURL, ServerError, "template error", state)
