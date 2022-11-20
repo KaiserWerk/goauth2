@@ -1,18 +1,25 @@
 package storage
 
-// A User represents a resource owner.
-type User struct {
-	ID       uint
-	Username string
-	Email    string
-	Password string
-	Disabled bool
-}
+type (
+	OAuth2User interface {
+		GetID() uint
+		SetID(uint)
+		GetUsername() string
+		SetUsername(string)
+		GetEmail() string
+		SetEmail(string)
+		GetPassword() string
+		SetPassword(string)
+		DoesPasswordMatch(string) bool
+		IsDisabled() bool
+		SetDisabled(bool)
+	}
 
-type UserStorage interface {
-	Get(id uint) (User, error)
-	GetByUsername(name string) (User, error)
-	Add(user User) error
-	Edit(user User) error
-	Remove(id uint) error
-}
+	UserStorage interface {
+		Get(id uint) (OAuth2User, error)
+		GetByUsername(name string) (OAuth2User, error)
+		Add(user OAuth2User) error
+		Edit(user OAuth2User) error
+		Remove(id uint) error
+	}
+)

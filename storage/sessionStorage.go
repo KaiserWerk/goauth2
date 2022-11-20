@@ -2,14 +2,17 @@ package storage
 
 import "time"
 
-type Session struct {
-	ID      string
-	UserID  uint
-	Expires time.Time
+type OAuth2Session interface {
+	GetID() string
+	SetID(string)
+	GetUserID() uint
+	SetUserID(uint)
+	GetExpires() time.Time
+	SetExpires(t time.Time)
 }
 
 type SessionStorage interface {
-	Get(string) (Session, error)
-	Add(Session) error
+	Get(string) (OAuth2Session, error)
+	Add(OAuth2Session) error
 	Remove(string) error
 }
