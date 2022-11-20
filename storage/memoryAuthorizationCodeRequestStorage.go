@@ -12,17 +12,17 @@ var (
 
 type MemoryAuthorizationCodeRequestStorage struct {
 	m        *sync.Mutex
-	requests map[string]AuthorizationCodeRequest
+	requests map[string]OAuth2AuthorizationCodeRequest
 }
 
 func NewMemoryAuthorizationCodeRequestStorage() *MemoryAuthorizationCodeRequestStorage {
 	return &MemoryAuthorizationCodeRequestStorage{
 		m:        new(sync.Mutex),
-		requests: make(map[string]AuthorizationCodeRequest),
+		requests: make(map[string]OAuth2AuthorizationCodeRequest),
 	}
 }
 
-func (s *MemoryAuthorizationCodeRequestStorage) Pop(code string) (AuthorizationCodeRequest, error) {
+func (s *MemoryAuthorizationCodeRequestStorage) Pop(code string) (OAuth2AuthorizationCodeRequest, error) {
 	s.m.Lock()
 	defer s.m.Unlock()
 
@@ -34,18 +34,18 @@ func (s *MemoryAuthorizationCodeRequestStorage) Pop(code string) (AuthorizationC
 	return AuthorizationCodeRequest{}, ErrAuthorizationCodeRequestEntryNotFound
 }
 
-func (s *MemoryAuthorizationCodeRequestStorage) Insert(request AuthorizationCodeRequest) error {
+func (s *MemoryAuthorizationCodeRequestStorage) Insert(request OAuth2AuthorizationCodeRequest) error {
 	s.m.Lock()
 	defer s.m.Unlock()
 
-	if _, found := s.requests[request.Code]; found {
+	if _, found := s.requests[request.GetCode()]; found {
 		return ErrAuthorizationCodeRequestEntryExists
 	}
 
-	s.requests[request.Code] = request
+	s.requests[request.GetCode()] = request
 	return nil
 }
 
-func (s *MemoryAuthorizationCodeRequestStorage) Close() error {
+func (_ *MemoryAuthorizationCodeRequestStorage) Close() error {
 	return nil
 }

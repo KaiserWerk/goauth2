@@ -13,21 +13,21 @@ var (
 
 type MemorySessionStorage struct {
 	m        *sync.RWMutex
-	sessions map[string]Session
+	sessions map[string]OAuth2Session
 }
 
 func NewMemorySessionStorage() *MemorySessionStorage {
 	return &MemorySessionStorage{
 		m:        new(sync.RWMutex),
-		sessions: make(map[string]Session),
+		sessions: make(map[string]OAuth2Session),
 	}
 }
 
-func (ss *MemorySessionStorage) Get(id string) (Session, error) {
+func (ss *MemorySessionStorage) Get(id string) (OAuth2Session, error) {
 	ss.m.RLock()
 	defer ss.m.RUnlock()
 	if s, found := ss.sessions[id]; found {
-		if s.Expires.After(time.Now()) {
+		if s.GetExpires().After(time.Now()) {
 			return s, nil
 		} else {
 			delete(ss.sessions, id)
@@ -37,14 +37,14 @@ func (ss *MemorySessionStorage) Get(id string) (Session, error) {
 	return Session{}, ErrSessionEntryNotFound
 }
 
-func (ss *MemorySessionStorage) Add(session Session) error {
+func (ss *MemorySessionStorage) Add(session OAuth2Session) error {
 	ss.m.Lock()
 	defer ss.m.Unlock()
-	if _, found := ss.sessions[session.ID]; found {
+	if _, found := ss.sessions[session.GetID()]; found {
 		return ErrSessionEntryExists
 	}
 
-	ss.sessions[session.ID] = session
+	ss.sessions[session.GetID()] = session
 	return nil
 }
 
@@ -58,6 +58,6 @@ func (ss *MemorySessionStorage) Remove(id string) error {
 	return nil
 }
 
-func (s *MemorySessionStorage) Close() error {
+func (_ *MemorySessionStorage) Close() error {
 	return nil
 }

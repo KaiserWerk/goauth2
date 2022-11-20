@@ -12,17 +12,17 @@ var (
 
 type DeviceCodeRequestStorage struct {
 	m        *sync.RWMutex
-	requests map[string]DeviceCodeRequest
+	requests map[string]OAuth2DeviceCodeRequest
 }
 
 func NewMemoryDeviceCodeRequestStorage() *DeviceCodeRequestStorage {
 	return &DeviceCodeRequestStorage{
 		m:        new(sync.RWMutex),
-		requests: make(map[string]DeviceCodeRequest),
+		requests: make(map[string]OAuth2DeviceCodeRequest),
 	}
 }
 
-func (dcrs *DeviceCodeRequestStorage) Get(userCode string) (DeviceCodeRequest, error) {
+func (dcrs *DeviceCodeRequestStorage) Get(userCode string) (OAuth2DeviceCodeRequest, error) {
 	dcrs.m.RLock()
 	defer dcrs.m.RUnlock()
 	if r, found := dcrs.requests[userCode]; found {
@@ -32,12 +32,12 @@ func (dcrs *DeviceCodeRequestStorage) Get(userCode string) (DeviceCodeRequest, e
 	return DeviceCodeRequest{}, nil
 }
 
-func (dcrs *DeviceCodeRequestStorage) Find(deviceCode, clientID string) (DeviceCodeRequest, error) {
+func (dcrs *DeviceCodeRequestStorage) Find(deviceCode, clientID string) (OAuth2DeviceCodeRequest, error) {
 	dcrs.m.RLock()
 	defer dcrs.m.RUnlock()
 
 	for _, e := range dcrs.requests {
-		if e.ClientID == clientID && e.Response.DeviceCode == deviceCode {
+		if e.GetClientID() == clientID && e.GetResponse().DeviceCode == deviceCode {
 			return e, nil
 		}
 	}
@@ -45,30 +45,30 @@ func (dcrs *DeviceCodeRequestStorage) Find(deviceCode, clientID string) (DeviceC
 	return DeviceCodeRequest{}, ErrDeviceCodeRequestEntryNotFound
 }
 
-func (dcrs *DeviceCodeRequestStorage) Add(request DeviceCodeRequest) error {
+func (dcrs *DeviceCodeRequestStorage) Add(request OAuth2DeviceCodeRequest) error {
 	dcrs.m.Lock()
 	defer dcrs.m.Unlock()
 
-	if _, found := dcrs.requests[request.Response.UserCode]; found {
+	if _, found := dcrs.requests[request.GetResponse().UserCode]; found {
 		return ErrDeviceCodeRequestEntryExists
 	}
 
-	dcrs.requests[request.Response.UserCode] = request
+	dcrs.requests[request.GetResponse().UserCode] = request
 	return nil
 }
 
-func (dcrs *DeviceCodeRequestStorage) Update(request DeviceCodeRequest) error {
+func (dcrs *DeviceCodeRequestStorage) Update(request OAuth2DeviceCodeRequest) error {
 	dcrs.m.Lock()
 	defer dcrs.m.Unlock()
 
-	if _, found := dcrs.requests[request.Response.UserCode]; !found {
+	if _, found := dcrs.requests[request.GetResponse().UserCode]; !found {
 		return ErrDeviceCodeRequestEntryNotFound
 	}
 
-	dcrs.requests[request.Response.UserCode] = request
+	dcrs.requests[request.GetResponse().UserCode] = request
 	return nil
 }
 
-func (s *DeviceCodeRequestStorage) Close() error {
+func (dcrs *DeviceCodeRequestStorage) Close() error {
 	return nil
 }

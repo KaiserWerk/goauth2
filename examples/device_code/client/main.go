@@ -45,6 +45,7 @@ func main() {
 	values := url.Values{} // these values can be used in the body with content type application/x-www-form-urlencoded or in the query string
 	values.Add("client_id", clientID)
 
+	// alternatively, you could use client.PostForm() instead of declaring a custom request
 	req, _ := http.NewRequest(http.MethodPost, authServerURL+"/device_authorization", strings.NewReader(values.Encode()))
 	// NewRequest only returns an error when URL is malformed/invalid
 	req.Header.Set("Content-Type", "application/x-www-form-urlencoded") // important to set the correct content type!
@@ -52,7 +53,7 @@ func main() {
 	resp, err := client.Do(req)
 	handleErr(err)
 
-	// 1. step is to obtain a device code (don't show to resource owner) and a user code code and
+	// 1. step is to obtain a device code (don't show to resource owner) and a user code and
 	// a verification URI (which are for the resource owner to see)
 	var authResponse DeviceCodeResponse
 	err = json.NewDecoder(resp.Body).Decode(&authResponse)

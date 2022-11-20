@@ -19,7 +19,7 @@ func main() {
 		Username: "tim",
 		Password: "test",
 	})
-	goauthSrv.Storage.ClientStorage.Set(storage.Client{
+	goauthSrv.Storage.ClientStorage.Add(storage.Client{
 		ID:      "my_cool_test_app",
 		Secret:  "9sfe196sgews8r7413423gf",
 		AppName: "My Cool Test App",
@@ -37,7 +37,7 @@ func main() {
 		}
 	})
 
-	router.HandleFunc("/device", func(w http.ResponseWriter, r *http.Request) {
+	router.HandleFunc(goauthSrv.URLs.DeviceCode, func(w http.ResponseWriter, r *http.Request) {
 		if err := goauthSrv.HandleDeviceCodeUserAuthorization(w, r); err != nil {
 			fmt.Println("HandleDeviceCodeUserAuthorization:", err.Error())
 		}

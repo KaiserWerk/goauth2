@@ -19,6 +19,8 @@ type OAuth2Client interface {
 // For in-memory implementations, Close() should be a no-op.
 type ClientStorage interface {
 	Get(string) (OAuth2Client, error)
-	Set(client OAuth2Client) error
+	Add(OAuth2Client) error
+	Edit(OAuth2Client) error
+	Remove(OAuth2Client) error
 	Close() error
 }

@@ -14,7 +14,7 @@ func main() {
 	srv.PublicBaseURL = "http://localhost:7777"
 	srv.URLs.Implicit = "/authorize"
 
-	srv.Storage.ClientStorage.Set(storage.Client{
+	srv.Storage.ClientStorage.Add(storage.Client{
 		ID:           "00000",
 		Secret:       "", // Secret is not needed for implicit flow
 		AppName:      "My Cool Implicit App",

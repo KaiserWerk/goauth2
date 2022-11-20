@@ -12,38 +12,57 @@ var (
 
 type MemoryClientStorage struct {
 	m       *sync.RWMutex
-	clients map[string]Client
+	clients map[string]OAuth2Client
 }
 
 func NewMemoryClientStorage() *MemoryClientStorage {
 	return &MemoryClientStorage{
 		m:       new(sync.RWMutex),
-		clients: make(map[string]Client),
+		clients: make(map[string]OAuth2Client),
 	}
 }
 
-func (cs *MemoryClientStorage) Get(id string) (Client, error) {
+func (cs *MemoryClientStorage) Get(id string) (OAuth2Client, error) {
 	cs.m.RLock()
 	defer cs.m.RUnlock()
 	c, found := cs.clients[id]
 	if !found {
-		return Client{}, ErrClientEntryNotFound
+		return nil, ErrClientEntryNotFound
 	}
 
 	return c, nil
 }
 
-func (cs *MemoryClientStorage) Set(cl Client) error {
+func (cs *MemoryClientStorage) Add(client OAuth2Client) error {
 	cs.m.Lock()
 	defer cs.m.Unlock()
-	_, found := cs.clients[cl.ID]
+	_, found := cs.clients[client.GetID()]
 	if found {
 		return ErrClientEntryExists
 	}
-	cs.clients[cl.ID] = cl
+	cs.clients[client.GetID()] = client
 	return nil
 }
 
-func (s *MemoryClientStorage) Close() error {
+func (cs *MemoryClientStorage) Edit(client OAuth2Client) error {
+	cs.m.Lock()
+	defer cs.m.Unlock()
+	_, found := cs.clients[client.GetID()]
+	if !found {
+		return ErrClientEntryNotFound
+	}
+
+	cs.clients[client.GetID()] = client
+	return nil
+}
+
+func (cs *MemoryClientStorage) Remove(client OAuth2Client) error {
+	cs.m.Lock()
+	defer cs.m.Unlock()
+	delete(cs.clients, client.GetID())
+	return nil
+}
+
+func (_ *MemoryClientStorage) Close() error {
 	return nil
 }
