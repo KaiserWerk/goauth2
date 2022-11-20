@@ -15,11 +15,14 @@ type (
 		SetDisabled(bool)
 	}
 
+	// A UserStorage stores information about users (resource owners).
+	// For in-memory implementations, Close() should be a no-op.
 	UserStorage interface {
 		Get(id uint) (OAuth2User, error)
 		GetByUsername(name string) (OAuth2User, error)
 		Add(user OAuth2User) error
 		Edit(user OAuth2User) error
 		Remove(id uint) error
+		Close() error
 	}
 )

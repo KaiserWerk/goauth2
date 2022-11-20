@@ -57,3 +57,7 @@ func (ss *MemorySessionStorage) Remove(id string) error {
 	delete(ss.sessions, id)
 	return nil
 }
+
+func (s *MemorySessionStorage) Close() error {
+	return nil
+}

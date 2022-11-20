@@ -1,23 +1,21 @@
 package storage
 
-type DeviceCodeRequest struct {
-	ClientID      string
-	Response      DeviceCodeResponse
-	TokenResponse Token
-}
-
-type DeviceCodeResponse struct {
-	DeviceCode              string `json:"device_code"`
-	UserCode                string `json:"user_code"`
-	VerificationURI         string `json:"verification_uri"`
-	VerificationURIComplete string `json:"verification_uri_complete"`
-	ExpiresIn               uint64 `json:"expires_in"`
-	Interval                uint64 `json:"interval"`
-}
-
-type DeviceCodeStorage interface {
-	Get(string) (DeviceCodeRequest, error)
-	Find(string, string) (DeviceCodeRequest, error)
-	Add(DeviceCodeRequest) error
-	Update(DeviceCodeRequest) error
-}
+type (
+	OAuth2DeviceCodeRequest interface {
+		GetClientID() string
+		SetClientID(string)
+		GetResponse() DeviceCodeResponse
+		SetResponse(DeviceCodeResponse)
+		GetTokenResponse() Token
+		SetTokenResponse(Token)
+	}
+	// DeviceCodeStorage stores device codes.
+	// For in-memory implementations, Close() should be a no-op.
+	DeviceCodeStorage interface {
+		Get(string) (OAuth2DeviceCodeRequest, error)
+		Find(string, string) (OAuth2DeviceCodeRequest, error)
+		Add(OAuth2DeviceCodeRequest) error
+		Update(OAuth2DeviceCodeRequest) error
+		Close() error
+	}
+)

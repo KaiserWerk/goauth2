@@ -45,3 +45,7 @@ func (s *MemoryAuthorizationCodeRequestStorage) Insert(request AuthorizationCode
 	s.requests[request.Code] = request
 	return nil
 }
+
+func (s *MemoryAuthorizationCodeRequestStorage) Close() error {
+	return nil
+}

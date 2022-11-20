@@ -56,3 +56,7 @@ func (ts *MemoryTokenStorage) Set(t Token) error {
 	ts.tokens[t.AccessToken] = t
 	return nil
 }
+
+func (s *MemoryTokenStorage) Close() error {
+	return nil
+}

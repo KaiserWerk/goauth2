@@ -27,9 +27,11 @@ type (
 
 	// A TokenStorage takes care of storing a supplied token associated with the given client ID.
 	// A token must be unique.
+	// For in-memory implementations, Close() should be a no-op.
 	TokenStorage interface {
 		FindByCodeChallenge(string) (OAuth2Token, error)
 		FindByAccessToken(string) (OAuth2Token, error)
 		Set(OAuth2Token) error
+		Close() error
 	}
 )

@@ -79,3 +79,7 @@ func (us *MemoryUserStorage) Remove(id uint) error {
 	delete(us.users, id)
 	return nil
 }
+
+func (s *MemoryUserStorage) Close() error {
+	return nil
+}

@@ -68,3 +68,7 @@ func (dcrs *DeviceCodeRequestStorage) Update(request DeviceCodeRequest) error {
 	dcrs.requests[request.Response.UserCode] = request
 	return nil
 }
+
+func (s *DeviceCodeRequestStorage) Close() error {
+	return nil
+}

@@ -43,3 +43,7 @@ func (cs *MemoryClientStorage) Set(cl Client) error {
 	cs.clients[cl.ID] = cl
 	return nil
 }
+
+func (s *MemoryClientStorage) Close() error {
+	return nil
+}
