@@ -12,6 +12,8 @@ type OAuth2Client interface {
 	HasRedirectURL(string) bool
 	AddRedirectURL(string)
 	RemoveRedirectURL(string)
+	GetRedirectURLs() []string
+	SetRedirectURLs([]string)
 	ClearRedirectURLS()
 }
 

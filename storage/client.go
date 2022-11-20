@@ -74,6 +74,14 @@ func (c Client) RemoveRedirectURL(u string) {
 	c.RedirectURLs = c.RedirectURLs[:len(c.RedirectURLs)-1]   // last element now exists twice, so cut it off
 }
 
+func (c Client) GetRedirectURLs() []string {
+	return c.RedirectURLs
+}
+
+func (c Client) SetRedirectURLs(urls []string) {
+	c.RedirectURLs = urls
+}
+
 func (c Client) ClearRedirectURLS() {
 	c.RedirectURLs = make([]string, 0, 10)
 }
