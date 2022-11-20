@@ -3,11 +3,12 @@ package goauth
 import (
 	"encoding/json"
 	"fmt"
-	"github.com/KaiserWerk/goauth2/usercode"
 	"net/http"
 	"net/url"
 	"sync"
 	"time"
+
+	"github.com/KaiserWerk/goauth2/usercode"
 
 	"github.com/KaiserWerk/goauth2/assets"
 

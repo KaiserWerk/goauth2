@@ -76,7 +76,7 @@ func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.R
 		return fmt.Errorf("failed to get client by ID '%s': %w", clientID, err)
 	}
 
-	if client.Secret != clientSecret {
+	if client.GetSecret() != clientSecret {
 		_ = s.ErrorResponse(w, http.StatusNotFound, UnauthorizedClient, "incorrect client credentials")
 		return fmt.Errorf("failed to confirm correct password for client by ID '%s'", clientID)
 	}
@@ -161,8 +161,8 @@ func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWr
 	}
 
 	// only require client authentication from confidential clients
-	if client.Secret != "" {
-		if client.Secret != clientSecret {
+	if client.IsConfidential() {
+		if client.GetSecret() != clientSecret {
 			_ = s.ErrorResponse(w, http.StatusUnauthorized, UnauthorizedClient, "failed client authentication")
 			return fmt.Errorf("client secret does not match")
 		}
@@ -174,7 +174,7 @@ func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWr
 		return fmt.Errorf("failed to find user with username '%s': %s", username, err.Error())
 	}
 
-	if user.Password != password {
+	if user.DoesPasswordMatch(password) {
 		_ = s.ErrorResponse(w, http.StatusBadRequest, AccessDenied, "failed resource owner authentication")
 		return fmt.Errorf("incorrect password for user '%s'", username)
 	}
@@ -237,14 +237,7 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 	}
 
 	// check if the redirect URL is in the client's list of registered redirect URLs
-	found := false
-	for _, e := range client.RedirectURLs {
-		if e == redirectURL {
-			found = true
-			break
-		}
-	}
-	if !found {
+	if !client.HasRedirectURL(redirectURL) {
 		s.ErrorRedirect(w, r, redirectURL, InvalidRequest, "callback URL not registered for client", "")
 		return fmt.Errorf("callback URL '%s' is not registered for client '%s'", redirectURL, client)
 	}
@@ -295,7 +288,7 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 		}{
 			Scopes:          scopes,
 			CancelURL:       fmt.Sprintf("%s?error=canceled", redirectURL),
-			ApplicationName: client.AppName,
+			ApplicationName: client.GetApplicationName(),
 		}
 		if err = executeTemplate(w, s.Template.ImplicitGrant, data); err != nil {
 			s.ErrorRedirect(w, r, redirectURL, ServerError, "template error", state)
@@ -332,7 +325,7 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 			AccessToken: accessToken,
 			TokenType:   "Bearer",
 			ExpiresIn:   uint64(s.Policies.AccessTokenLifetime.Seconds()),
-			Scope:       acceptedScopes,
+			Scope:       &acceptedScopes,
 			State:       state,
 		}
 
@@ -483,11 +476,11 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 			return fmt.Errorf("failed to generate user code: %s", err.Error())
 		}
 
-		deviceRequest.TokenResponse = storage.Token{
+		deviceRequest.SetTokenResponse(storage.Token{
 			AccessToken: accessToken,
 			TokenType:   "Bearer",
 			ExpiresIn:   86400,
-		}
+		})
 
 		if err := s.Storage.DeviceCodeRequestStorage.Update(deviceRequest); err != nil {
 			http.Error(w, "failed to update device code request", http.StatusNotFound)
@@ -536,10 +529,10 @@ func (s *Server) HandleDeviceCodeTokenRequest(w http.ResponseWriter, r *http.Req
 		return fmt.Errorf("failed to find request: %s", err.Error())
 	}
 
-	if deviceRequest.TokenResponse.AccessToken == "" {
+	if deviceRequest.GetTokenResponse().AccessToken == "" {
 		http.Error(w, `{"error": "authorization_pending"}`, http.StatusOK)
 	} else {
-		if err := json.NewEncoder(w).Encode(deviceRequest.TokenResponse); err != nil {
+		if err := json.NewEncoder(w).Encode(deviceRequest.GetTokenResponse()); err != nil {
 			http.Error(w, "failed to serialize JSON", http.StatusBadRequest)
 			return fmt.Errorf("failed to serialize JSON: %s", err.Error())
 		}
@@ -647,7 +640,7 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 		}{
 			Scopes:          scopes,
 			CancelURL:       fmt.Sprintf("%s?error=canceled", redirectURL),
-			ApplicationName: client.AppName,
+			ApplicationName: client.GetApplicationName(),
 		}
 		if err = executeTemplate(w, s.Template.AuthorizationCode, data); err != nil {
 			s.ErrorRedirect(w, r, redirectURL, ServerError, "template error", state)
@@ -675,7 +668,7 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 		authCodeReq := storage.AuthorizationCodeRequest{
 			ClientID: clientID,
 			Code:     ac,
-			Scope:    acceptedScopes,
+			Scope:    &acceptedScopes,
 		}
 
 		if s.Flags.PKCE {
@@ -754,7 +747,7 @@ func (s *Server) HandleAuthorizationCodeTokenRequest(w http.ResponseWriter, r *h
 		return fmt.Errorf("client_id missing")
 	}
 
-	if client.Secret != clientSecret {
+	if client.GetSecret() != clientSecret {
 		_ = s.ErrorResponse(w, http.StatusBadRequest, UnauthorizedClient, "client authentication failed")
 		return fmt.Errorf("client secret not matching")
 	}
@@ -785,12 +778,12 @@ func (s *Server) HandleAuthorizationCodeTokenRequest(w http.ResponseWriter, r *h
 		}
 
 		confirmed := false
-		if authCodeReq.CodeChallengeMethod == "plain" {
-			confirmed = authCodeReq.CodeChallenge == codeVerifier
-		} else if authCodeReq.CodeChallengeMethod == "S256" {
+		if authCodeReq.GetCodeChallengeMethod() == "plain" {
+			confirmed = authCodeReq.GetCodeChallenge() == codeVerifier
+		} else if authCodeReq.GetCodeChallengeMethod() == "S256" {
 			h := sha256.New()
 			h.Write([]byte(codeVerifier))
-			confirmed = authCodeReq.CodeChallenge == base64.URLEncoding.EncodeToString(h.Sum(nil)))
+			confirmed = authCodeReq.GetCodeChallenge() == base64.URLEncoding.EncodeToString(h.Sum(nil))
 		}
 
 		if !confirmed {
@@ -805,7 +798,7 @@ func (s *Server) HandleAuthorizationCodeTokenRequest(w http.ResponseWriter, r *h
 		TokenType:    "Bearer",
 		ExpiresIn:    uint64(s.Policies.AccessTokenLifetime.Seconds()),
 		RefreshToken: rt,
-		Scope:        authCodeReq.Scope,
+		Scope:        authCodeReq.GetScope(),
 	}
 
 	if err = s.Storage.TokenStorage.Set(token); err != nil {
@@ -829,7 +822,7 @@ func (s *Server) HandleAuthorizationCodeTokenRequest(w http.ResponseWriter, r *h
 func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 	w.Header().Set("content-Type", "text/html; charset=utf8")
 	user, err := s.isLoggedIn(r)
-	if err == nil && user.Username != "" {
+	if err == nil && user.GetUsername() != "" {
 		fmt.Fprintln(w, template.HTML("You are already logged in! You can perform authorizations now. <a href='"+s.URLs.Logout+"'>Log out</a>"))
 		return nil
 	}
@@ -854,7 +847,7 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
-		if u.Password != password {
+		if u.DoesPasswordMatch(password) {
 			http.Error(w, "passwords didn't match", http.StatusNotFound)
 			return fmt.Errorf("passwords didn't match")
 		}
@@ -866,7 +859,7 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 		}
 		session := storage.Session{
 			ID:      sessionID,
-			UserID:  u.ID,
+			UserID:  u.GetID(),
 			Expires: time.Now().Add(30 * 24 * time.Hour),
 		}
 		if err := s.Storage.SessionStorage.Add(session); err != nil {
@@ -926,8 +919,7 @@ func (s *Server) HandleUserLogout(w http.ResponseWriter, r *http.Request) error 
 }
 
 /* helpers */
-
-func (s *Server) isLoggedIn(r *http.Request) (storage.User, error) {
+func (s *Server) isLoggedIn(r *http.Request) (storage.OAuth2User, error) {
 	sid, err := s.getSessionID(r)
 	if err != nil || sid == "" {
 		return storage.User{}, fmt.Errorf("user is not logged in")
@@ -938,7 +930,7 @@ func (s *Server) isLoggedIn(r *http.Request) (storage.User, error) {
 		return storage.User{}, fmt.Errorf("user had session ID, but was not found")
 	}
 
-	user, err := s.Storage.UserStorage.Get(session.UserID)
+	user, err := s.Storage.UserStorage.Get(session.GetUserID())
 	if err != nil {
 		return storage.User{}, fmt.Errorf("valid session, but didn't find user")
 	}

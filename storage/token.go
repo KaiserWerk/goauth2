@@ -7,7 +7,7 @@ type Token struct {
 	TokenType         string `json:"token_type"`
 	ExpiresIn         uint64 `json:"expires_in"`
 	RefreshToken      string `json:"refresh_token,omitempty"`
-	Scope             Scope  `json:"scope,omitempty"`
+	Scope             *Scope `json:"scope,omitempty"`
 	State             string `json:"state,omitempty"`
 	CodeChallenge     string `json:"code_challenge,omitempty"`
 	AuthorizationCode string `json:"authorization_code,omitempty"`
