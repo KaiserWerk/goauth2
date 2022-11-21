@@ -847,7 +847,7 @@ func (s *Server) HandleUserLogin(w http.ResponseWriter, r *http.Request) error {
 			return err
 		}
 
-		if u.DoesPasswordMatch(password) {
+		if !u.DoesPasswordMatch(password) {
 			http.Error(w, "passwords didn't match", http.StatusNotFound)
 			return fmt.Errorf("passwords didn't match")
 		}
