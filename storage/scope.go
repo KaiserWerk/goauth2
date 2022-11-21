@@ -9,6 +9,12 @@ import (
 
 type Scope []string
 
+func NewScope(raw string) *Scope {
+	parts := strings.Split(strings.TrimSpace(raw), " ")
+	s := Scope(parts)
+	return &s
+}
+
 func (s *Scope) MarshalJSON() ([]byte, error) {
 	if s == nil {
 		return nil, fmt.Errorf("scope is nil")
