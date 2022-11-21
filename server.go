@@ -236,6 +236,17 @@ func NewEmptyServer() *Server {
 	}
 }
 
+// Cleanup should be executed when the Server is not required anymore, typically at app shutdown.
+// Cleanup frees resources used by the Server.
+func (s *Server) Cleanup() {
+	_ = s.Storage.ClientStorage.Close()
+	_ = s.Storage.TokenStorage.Close()
+	_ = s.Storage.UserStorage.Close()
+	_ = s.Storage.SessionStorage.Close()
+	_ = s.Storage.AuthorizationCodeRequestStorage.Close()
+	_ = s.Storage.DeviceCodeRequestStorage.Close()
+}
+
 // AddGrantType adds the given grant type to the current list of enabled grant types for the server s.
 // A grant type not listed might not be available, depending on the caller's usage.
 // You can use this call to change the availability of a given grant type while the Server is in use.
