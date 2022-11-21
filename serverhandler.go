@@ -93,7 +93,7 @@ func (s *Server) HandleClientCredentialsRequest(w http.ResponseWriter, r *http.R
 		TokenType:   "Bearer",
 	}
 
-	if err = s.Storage.TokenStorage.Set(resp); err != nil {
+	if err = s.Storage.TokenStorage.Add(resp); err != nil {
 		_ = s.ErrorResponse(w, http.StatusInternalServerError, ServerError, "internal error")
 		return fmt.Errorf("failed to store token: %w", err)
 	}
@@ -191,7 +191,7 @@ func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWr
 		ExpiresIn:   uint64(s.Policies.AccessTokenLifetime.Seconds()),
 	}
 
-	if err = s.Storage.TokenStorage.Set(t); err != nil {
+	if err = s.Storage.TokenStorage.Add(t); err != nil {
 		_ = s.ErrorResponse(w, http.StatusInternalServerError, ServerError, "internal error")
 		return fmt.Errorf("failed to store token: %s", err.Error())
 	}
@@ -330,7 +330,7 @@ func (s *Server) HandleImplicitAuthorizationRequest(w http.ResponseWriter, r *ht
 		}
 
 		// store the token info
-		if err = s.Storage.TokenStorage.Set(token); err != nil {
+		if err = s.Storage.TokenStorage.Add(token); err != nil {
 			values := url.Values{}
 			values.Add("error", "server_error")
 			values.Add("error_description", "internal error")
@@ -801,7 +801,7 @@ func (s *Server) HandleAuthorizationCodeTokenRequest(w http.ResponseWriter, r *h
 		Scope:        authCodeReq.GetScope(),
 	}
 
-	if err = s.Storage.TokenStorage.Set(token); err != nil {
+	if err = s.Storage.TokenStorage.Add(token); err != nil {
 		_ = s.ErrorResponse(w, http.StatusInternalServerError, InvalidRequest, "internal error")
 		return fmt.Errorf("failed to store token")
 	}

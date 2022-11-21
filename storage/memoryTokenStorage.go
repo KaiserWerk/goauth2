@@ -46,7 +46,7 @@ func (ts *MemoryTokenStorage) FindByCodeChallenge(cc string) (OAuth2Token, error
 	return nil, ErrTokenEntryNotFound
 }
 
-func (ts *MemoryTokenStorage) Set(t OAuth2Token) error {
+func (ts *MemoryTokenStorage) Add(t OAuth2Token) error {
 	ts.m.Lock()
 	defer ts.m.Unlock()
 	_, found := ts.tokens[t.GetAccessToken()]

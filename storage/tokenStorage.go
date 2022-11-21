@@ -31,7 +31,7 @@ type (
 	TokenStorage interface {
 		FindByCodeChallenge(string) (OAuth2Token, error)
 		FindByAccessToken(string) (OAuth2Token, error)
-		Set(OAuth2Token) error
+		Add(OAuth2Token) error
 		Remove(OAuth2Token) error
 		Close() error
 	}
