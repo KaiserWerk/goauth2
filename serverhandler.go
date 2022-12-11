@@ -174,7 +174,7 @@ func (s *Server) HandleResourceOwnerPasswordCredentialsRequest(w http.ResponseWr
 		return fmt.Errorf("failed to find user with username '%s': %s", username, err.Error())
 	}
 
-	if user.DoesPasswordMatch(password) {
+	if !user.DoesPasswordMatch(password) {
 		_ = s.ErrorResponse(w, http.StatusBadRequest, AccessDenied, "failed resource owner authentication")
 		return fmt.Errorf("incorrect password for user '%s'", username)
 	}
