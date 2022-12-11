@@ -972,7 +972,7 @@ func (s *Server) HandleTokenIntrospectionRequest(w http.ResponseWriter, r *http.
 	token, err := s.Storage.TokenStorage.FindByAccessToken(accessToken)
 	if err != nil {
 		_ = writeIntrospectionResponse(w, resp, http.StatusBadRequest)
-		return fmt.Errorf("failed to find token by access token")
+		return fmt.Errorf("failed to find token by access token: %w", err)
 	}
 
 	if token.IsValid() {
@@ -987,6 +987,7 @@ func (s *Server) HandleTokenIntrospectionRequest(w http.ResponseWriter, r *http.
 }
 
 func writeIntrospectionResponse(w http.ResponseWriter, resp types.IntrospectionResponse, statusCode int) error {
+	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	data, err := json.MarshalIndent(resp, "", "\t")
 	if err != nil {
 		return err
