@@ -284,8 +284,8 @@ to the RFCs. If there are still things unclear, please open an issue and I will 
 
 The following examples are currently available:
 
-- [ ] Client Credentials Grant
-- [ ] Resource Owner Password Credentials Grant
+- [X] Client Credentials Grant
+- [X] Resource Owner Password Credentials Grant
 - [X] Implicit Grant
 - [X] Device Code Grant
 - [ ] Authorization Code Grant
