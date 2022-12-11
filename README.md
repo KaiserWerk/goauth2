@@ -290,3 +290,35 @@ The following examples are currently available:
 - [X] Device Code Grant
 - [ ] Authorization Code Grant
 - [ ] Authorization Code Grant with Proof Key for Code Exchange
+
+## Security Considerations
+Source: [oauth2.com](https://www.oauth.com/oauth2-servers/token-introspection-endpoint/)
+
+### Token Fishing
+If the introspection endpoint is left open and un-throttled, it presents a means for an attacker to 
+poll the endpoint fishing for a valid token. To prevent this, the server must either require 
+authentication of the clients using the endpoint, or only make the endpoint available to internal 
+servers through other means such as a firewall.
+
+Note that the resources servers are also a potential target of a fishing attack, and should take 
+countermeasures such as rate limiting to prevent this.
+
+### Caching
+Consumers of the introspection endpoint may wish to cache the response of the endpoint for performance 
+reasons. As such, it is important to consider the performance and security trade-offs when deciding 
+to cache the values. For example, shorter cache expiration times will result in higher security since 
+the resource servers will have to query the introspection endpoint more frequently, but will result 
+in an increased load on the endpoint. Longer expiration times leave a window open where a token may 
+actually be expired or revoked, but still be able to be used at a resource server for the remaining 
+duration of the cache time.
+
+One way to mitigate this problem is for consumers to never cache the value beyond the expiration 
+time of the token, which would have been returned in the “exp” parameter of the introspection response.
+
+### Limiting Information
+The introspection endpoint does not necessarily need to return the same information for all queries 
+of the same token. For example, two different resource servers (if they authenticate themselves 
+when making the introspection request) may get different views of the state of the token. This can 
+be used to limit the information about the token that is returned to a particular resource server. 
+This makes it possible to have tokens that can be used at multiple resource servers without other 
+servers ever knowing it is possible to be used at any other server.
