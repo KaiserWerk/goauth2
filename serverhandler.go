@@ -6,6 +6,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/KaiserWerk/goauth2/types"
 	"html/template"
 	"io"
 	"net/http"
@@ -920,64 +921,78 @@ func (s *Server) HandleUserLogout(w http.ResponseWriter, r *http.Request) error 
 
 func (s *Server) HandleTokenIntrospectionRequest(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
+	var resp types.IntrospectionResponse
 	if r.Method != http.MethodPost {
-		http.Error(w, "disallowed method", http.StatusBadRequest)
+		_ = writeIntrospectionResponse(w, resp, http.StatusBadRequest)
 		return fmt.Errorf("method %s not allowed", r.Method)
 	}
 
 	if ct := r.Header.Get("Content-Type"); ct != "application/x-www-form-urlencoded" {
-		http.Error(w, "wrong content type header", http.StatusBadRequest)
+		_ = writeIntrospectionResponse(w, resp, http.StatusBadRequest)
 		return fmt.Errorf("expected content type header to be 'application/x-www-form-urlencoded'. got '%s'", ct)
 	}
 
 	clientID, clientSecret, ok := r.BasicAuth()
 	if !ok {
-		http.Error(w, "failed basic auth", http.StatusBadRequest)
+		resp.Error = "invalid_client"
+		resp.Error = "The client authentication was invalid"
+		_ = writeIntrospectionResponse(w, resp, http.StatusUnauthorized)
 		return fmt.Errorf("failed basic auth")
 	}
 
 	client, err := s.Storage.ClientStorage.Get(clientID)
 	if err != nil {
-		http.Error(w, "error getting client", http.StatusBadRequest)
+		_ = writeIntrospectionResponse(w, resp, http.StatusBadRequest)
 		return fmt.Errorf("error getting client: %w", err)
 	}
 
 	if client.GetID() != clientID || client.GetSecret() != clientSecret {
-		http.Error(w, "error authenticating client", http.StatusBadRequest)
+		_ = writeIntrospectionResponse(w, resp, http.StatusBadRequest)
 		return fmt.Errorf("error authenticating client: %w", err)
 	}
 
 	body, err := io.ReadAll(r.Body)
 	if err != nil {
-		http.Error(w, "error reading request body", http.StatusBadRequest)
+		_ = writeIntrospectionResponse(w, resp, http.StatusBadRequest)
 		return fmt.Errorf("failed to read request body: %s", err.Error())
 	}
 
 	values, err := url.ParseQuery(string(body))
 	if err != nil {
-		http.Error(w, "malformed request body", http.StatusBadRequest)
+		_ = writeIntrospectionResponse(w, resp, http.StatusBadRequest)
 		return fmt.Errorf("failed to parse request body: %s", err.Error())
 	}
 
 	if !values.Has("token") {
-		http.Error(w, "missing request parameter", http.StatusBadRequest)
-		return fmt.Errorf("missing request parameter '%s'", "client_id")
+		_ = writeIntrospectionResponse(w, resp, http.StatusBadRequest)
+		return fmt.Errorf("missing request parameter '%s'", "token")
 	}
 
 	accessToken := values.Get("token")
-
 	token, err := s.Storage.TokenStorage.FindByAccessToken(accessToken)
 	if err != nil {
-		http.Error(w, "", http.StatusBadRequest)
-
-		return fmt.Errorf("missing request parameter '%s'", "client_id")
+		_ = writeIntrospectionResponse(w, resp, http.StatusBadRequest)
+		return fmt.Errorf("failed to find token by access token")
 	}
 
+	if token.IsValid() {
+		resp.Active = true
+		resp.ClientID = clientID
+		resp.Scope = token.GetScope()
+		resp.Expires = uint64(token.GetGeneratedAt().Add(time.Duration(token.GetExpiresIn()) * time.Second).Unix())
+	}
+
+	_ = writeIntrospectionResponse(w, resp, http.StatusOK)
 	return nil
 }
 
-func writeIntrospectionResponse() error {
-
+func writeIntrospectionResponse(w http.ResponseWriter, resp types.IntrospectionResponse, statusCode int) error {
+	data, err := json.MarshalIndent(resp, "", "\t")
+	if err != nil {
+		return err
+	}
+	http.Error(w, string(data), statusCode)
+	return nil
 }
 
 /* helpers */

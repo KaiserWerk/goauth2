@@ -1,16 +1,19 @@
 package storage
 
+import "time"
+
 // A Token is a ready-to-use implementation of the OAuth2Token interface.
 type Token struct {
-	ClientID          string `json:"-"`
-	AccessToken       string `json:"access_token"`
-	TokenType         string `json:"token_type"`
-	ExpiresIn         uint64 `json:"expires_in"`
-	RefreshToken      string `json:"refresh_token,omitempty"`
-	Scope             *Scope `json:"scope,omitempty"`
-	State             string `json:"state,omitempty"`
-	CodeChallenge     string `json:"code_challenge,omitempty"`
-	AuthorizationCode string `json:"authorization_code,omitempty"`
+	ClientID          string    `json:"-"`
+	AccessToken       string    `json:"access_token"`
+	TokenType         string    `json:"token_type"`
+	ExpiresIn         uint64    `json:"expires_in"`
+	RefreshToken      string    `json:"refresh_token,omitempty"`
+	State             string    `json:"state,omitempty"`
+	CodeChallenge     string    `json:"code_challenge,omitempty"`
+	AuthorizationCode string    `json:"authorization_code,omitempty"`
+	Scope             *Scope    `json:"scope,omitempty"`
+	GeneratedAt       time.Time `json:"-"`
 }
 
 func (t Token) GetClientID() string {
@@ -26,81 +29,81 @@ func (t Token) GetAccessToken() string {
 }
 
 func (t Token) SetAccessToken(at string) {
-	//TODO implement me
-	panic("implement me")
+	t.AccessToken = at
 }
 
 func (t Token) GetTokenType() string {
-	//TODO implement me
-	panic("implement me")
+	return t.TokenType
 }
 
 func (t Token) SetTokenType(tt string) {
-	//TODO implement me
-	panic("implement me")
+	t.TokenType = tt
 }
 
 func (t Token) GetExpiresIn() uint64 {
-	//TODO implement me
-	panic("implement me")
+	return t.ExpiresIn
 }
 
 func (t Token) SetExpiresIn(ex uint64) {
-	//TODO implement me
-	panic("implement me")
+	t.ExpiresIn = ex
 }
 
 func (t Token) GetRefreshToken() string {
-	//TODO implement me
-	panic("implement me")
+	return t.RefreshToken
 }
 
 func (t Token) SetRefreshToken(rt string) {
-	//TODO implement me
-	panic("implement me")
+	t.RefreshToken = rt
 }
 
 func (t Token) GetScope() *Scope {
-	//TODO implement me
-	panic("implement me")
+	return t.Scope
 }
 
 func (t Token) SetScope(scope *Scope) {
-	//TODO implement me
-	panic("implement me")
+	t.Scope = scope
 }
 
 func (t Token) SetRawScope(raw string) {
-	//TODO implement me
-	panic("implement me")
+
 }
 
 func (t Token) GetState() string {
-	//TODO implement me
-	panic("implement me")
+	return t.State
 }
 
 func (t Token) SetState(s string) {
-	//TODO implement me
-	panic("implement me")
+	t.State = s
 }
 
 func (t Token) GetCodeChallenge() string {
-	//TODO implement me
-	panic("implement me")
+	return t.CodeChallenge
 }
 
 func (t Token) SetCodeChallenge(cc string) {
-	//TODO implement me
-	panic("implement me")
+	t.CodeChallenge = cc
 }
 
 func (t Token) GetAuthorizationCode() string {
-	//TODO implement me
-	panic("implement me")
+	return t.AuthorizationCode
 }
 
 func (t Token) SetAuthorizationCode(ac string) {
-	//TODO implement me
-	panic("implement me")
+	t.AuthorizationCode = ac
+}
+
+func (t Token) GetGeneratedAt() time.Time {
+	return t.GeneratedAt
+}
+
+func (t Token) SetGeneratedAt(ga time.Time) {
+	t.GeneratedAt = ga
+}
+
+func (t Token) IsValid() bool {
+	return t.GetAccessToken() != "" && !t.IsExpired()
+}
+
+func (t Token) IsExpired() bool {
+	return t.GetGeneratedAt().Add(time.Duration(t.GetExpiresIn()) * time.Second).After(time.Now())
 }

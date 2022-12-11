@@ -1,5 +1,7 @@
 package storage
 
+import "time"
+
 type (
 	// An OAuth2Token represents the (meta)data related to a successfully executed authorization process.
 	// You can use your own implementation or the existing Token{}.
@@ -23,6 +25,10 @@ type (
 		SetCodeChallenge(string)
 		GetAuthorizationCode() string
 		SetAuthorizationCode(string)
+		GetGeneratedAt() time.Time
+		SetGeneratedAt(time.Time)
+		IsValid() bool
+		IsExpired() bool
 	}
 
 	// A TokenStorage takes care of storing a supplied token associated with the given client ID.
