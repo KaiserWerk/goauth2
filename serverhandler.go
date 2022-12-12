@@ -577,7 +577,7 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 	}
 
 	redirectURLRaw := r.URL.Query().Get("redirect_uri")
-	if redirectURLRaw != "" {
+	if redirectURLRaw == "" {
 		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter redirect_uri missing")
 		return fmt.Errorf("parameter redirect_uri missing")
 	}
