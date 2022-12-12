@@ -7,7 +7,10 @@
     {{ end }}
     <br>
     The application <b>{{ .ApplicationName }}</b> would like to be authorized by you:<br>
-    <label for="_user_code">User Code:</label><br><input type="text" name="_user_code" id="_user_code" size="12"><br>
+    {{ range $i, $e := .Scopes }}
+        <input type="checkbox" name="_accepted_scopes" value="{{ $e }}" id="{{ $i }}" checked> <label for="{{ $i }}">{{ $e }}</label><br>
+    {{ end }}
+    <br>
     <br>
     <button type="submit">Authorize</button>
 </form>
