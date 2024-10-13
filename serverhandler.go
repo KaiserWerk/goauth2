@@ -921,52 +921,7 @@ func (s *Server) HandleUserLogout(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
-/* helpers */
-func (s *Server) isLoggedIn(r *http.Request) (storage.OAuth2User, error) {
-	sid, err := s.getSessionID(r)
-	if err != nil || sid == "" {
-		return storage.User{}, fmt.Errorf("user is not logged in")
-	}
-
-	session, err := s.Storage.SessionStorage.Get(sid)
-	if err != nil {
-		return storage.User{}, fmt.Errorf("user had session ID, but was not found")
-	}
-
-	user, err := s.Storage.UserStorage.Get(session.GetUserID())
-	if err != nil {
-		return storage.User{}, fmt.Errorf("valid session, but didn't find user")
-	}
-
-	return user, nil
-}
-
-func (s *Server) getSessionID(r *http.Request) (string, error) {
-	c, err := r.Cookie(s.Session.CookieName)
-	if err != nil {
-		return "", err
-	}
-
-	return c.Value, nil
-}
-
-func executeTemplate(w io.Writer, content []byte, data interface{}) error {
-	if content == nil {
-		return fmt.Errorf("template content was nil")
-	}
-	tmpl := template.Must(template.New("").Parse(string(content)))
-	return tmpl.Execute(w, data)
-}
-
-func isStringInSlice(sl []string, s string) bool {
-	for _, e := range sl {
-		if e == s {
-			return true
-		}
-	}
-
-	return false
-}
+/* Token instrospection */
 
 func (s *Server) HandleTokenIntrospectionRequest(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
@@ -1033,6 +988,53 @@ func (s *Server) HandleTokenIntrospectionRequest(w http.ResponseWriter, r *http.
 
 	_ = writeIntrospectionResponse(w, resp, http.StatusOK)
 	return nil
+}
+
+/* helpers */
+func (s *Server) isLoggedIn(r *http.Request) (storage.OAuth2User, error) {
+	sid, err := s.getSessionID(r)
+	if err != nil || sid == "" {
+		return storage.User{}, fmt.Errorf("user is not logged in")
+	}
+
+	session, err := s.Storage.SessionStorage.Get(sid)
+	if err != nil {
+		return storage.User{}, fmt.Errorf("user had session ID, but was not found")
+	}
+
+	user, err := s.Storage.UserStorage.Get(session.GetUserID())
+	if err != nil {
+		return storage.User{}, fmt.Errorf("valid session, but didn't find user")
+	}
+
+	return user, nil
+}
+
+func (s *Server) getSessionID(r *http.Request) (string, error) {
+	c, err := r.Cookie(s.Session.CookieName)
+	if err != nil {
+		return "", err
+	}
+
+	return c.Value, nil
+}
+
+func executeTemplate(w io.Writer, content []byte, data interface{}) error {
+	if content == nil {
+		return fmt.Errorf("template content was nil")
+	}
+	tmpl := template.Must(template.New("").Parse(string(content)))
+	return tmpl.Execute(w, data)
+}
+
+func isStringInSlice(sl []string, s string) bool {
+	for _, e := range sl {
+		if e == s {
+			return true
+		}
+	}
+
+	return false
 }
 
 func writeIntrospectionResponse(w http.ResponseWriter, resp types.IntrospectionResponse, statusCode int) error {
