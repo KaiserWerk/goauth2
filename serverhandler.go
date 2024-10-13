@@ -6,7 +6,6 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
-	"github.com/KaiserWerk/goauth2/types"
 	"html/template"
 	"io"
 	"net/http"
@@ -15,6 +14,7 @@ import (
 	"time"
 
 	"github.com/KaiserWerk/goauth2/storage"
+	"github.com/KaiserWerk/goauth2/types"
 )
 
 var (
@@ -647,6 +647,7 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 			s.ErrorRedirect(w, r, redirectURL, ServerError, "template error", state)
 			return fmt.Errorf("template error: %w", err)
 		}
+		return nil
 	} else if r.Method == http.MethodPost {
 		_ = r.ParseForm()
 
@@ -691,7 +692,7 @@ func (s *Server) HandleAuthorizationCodeAuthorizationRequest(w http.ResponseWrit
 		values.Add("code", ac)
 
 		target := fmt.Sprintf("%s?%s", redirectURL, values.Encode())
-		http.Redirect(w, r, target, http.StatusOK)
+		http.Redirect(w, r, target, http.StatusSeeOther)
 		return nil
 	}
 
@@ -730,6 +731,7 @@ func (s *Server) HandleAuthorizationCodeTokenRequest(w http.ResponseWriter, r *h
 		_ = s.ErrorResponse(w, http.StatusBadRequest, InvalidRequest, "parameter code missing")
 		return fmt.Errorf("parameter code missing")
 	}
+	code = strings.ReplaceAll(code, " ", "+")
 
 	clientID := values.Get("client_id")
 	var clientSecret string
@@ -919,6 +921,53 @@ func (s *Server) HandleUserLogout(w http.ResponseWriter, r *http.Request) error 
 	return nil
 }
 
+/* helpers */
+func (s *Server) isLoggedIn(r *http.Request) (storage.OAuth2User, error) {
+	sid, err := s.getSessionID(r)
+	if err != nil || sid == "" {
+		return storage.User{}, fmt.Errorf("user is not logged in")
+	}
+
+	session, err := s.Storage.SessionStorage.Get(sid)
+	if err != nil {
+		return storage.User{}, fmt.Errorf("user had session ID, but was not found")
+	}
+
+	user, err := s.Storage.UserStorage.Get(session.GetUserID())
+	if err != nil {
+		return storage.User{}, fmt.Errorf("valid session, but didn't find user")
+	}
+
+	return user, nil
+}
+
+func (s *Server) getSessionID(r *http.Request) (string, error) {
+	c, err := r.Cookie(s.Session.CookieName)
+	if err != nil {
+		return "", err
+	}
+
+	return c.Value, nil
+}
+
+func executeTemplate(w io.Writer, content []byte, data interface{}) error {
+	if content == nil {
+		return fmt.Errorf("template content was nil")
+	}
+	tmpl := template.Must(template.New("").Parse(string(content)))
+	return tmpl.Execute(w, data)
+}
+
+func isStringInSlice(sl []string, s string) bool {
+	for _, e := range sl {
+		if e == s {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (s *Server) HandleTokenIntrospectionRequest(w http.ResponseWriter, r *http.Request) error {
 	defer r.Body.Close()
 	var resp types.IntrospectionResponse
@@ -994,51 +1043,4 @@ func writeIntrospectionResponse(w http.ResponseWriter, resp types.IntrospectionR
 	}
 	http.Error(w, string(data), statusCode)
 	return nil
-}
-
-/* helpers */
-func (s *Server) isLoggedIn(r *http.Request) (storage.OAuth2User, error) {
-	sid, err := s.getSessionID(r)
-	if err != nil || sid == "" {
-		return storage.User{}, fmt.Errorf("user is not logged in")
-	}
-
-	session, err := s.Storage.SessionStorage.Get(sid)
-	if err != nil {
-		return storage.User{}, fmt.Errorf("user had session ID, but was not found")
-	}
-
-	user, err := s.Storage.UserStorage.Get(session.GetUserID())
-	if err != nil {
-		return storage.User{}, fmt.Errorf("valid session, but didn't find user")
-	}
-
-	return user, nil
-}
-
-func (s *Server) getSessionID(r *http.Request) (string, error) {
-	c, err := r.Cookie(s.Session.CookieName)
-	if err != nil {
-		return "", err
-	}
-
-	return c.Value, nil
-}
-
-func executeTemplate(w io.Writer, content []byte, data interface{}) error {
-	if content == nil {
-		return fmt.Errorf("template content was nil")
-	}
-	tmpl := template.Must(template.New("").Parse(string(content)))
-	return tmpl.Execute(w, data)
-}
-
-func isStringInSlice(sl []string, s string) bool {
-	for _, e := range sl {
-		if e == s {
-			return true
-		}
-	}
-
-	return false
 }
