@@ -40,7 +40,7 @@ func main() {
 	clientID := "my_cool_test_app"
 	// clientSecret is not needed in this flow
 
-	client := &http.Client{Timeout: 10 * time.Second} // use a proper *http.Client at least for timeouts
+	client := &http.Client{Timeout: 120 * time.Second} // use a proper *http.Client at least for timeouts
 
 	values := url.Values{} // these values can be used in the body with content type application/x-www-form-urlencoded or in the query string
 	values.Add("client_id", clientID)

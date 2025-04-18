@@ -29,7 +29,7 @@ func (dcrs *DeviceCodeRequestStorage) Get(userCode string) (OAuth2DeviceCodeRequ
 		return r, nil
 	}
 
-	return DeviceCodeRequest{}, nil
+	return nil, nil
 }
 
 func (dcrs *DeviceCodeRequestStorage) Find(deviceCode, clientID string) (OAuth2DeviceCodeRequest, error) {
@@ -42,7 +42,7 @@ func (dcrs *DeviceCodeRequestStorage) Find(deviceCode, clientID string) (OAuth2D
 		}
 	}
 
-	return DeviceCodeRequest{}, ErrDeviceCodeRequestEntryNotFound
+	return nil, ErrDeviceCodeRequestEntryNotFound
 }
 
 func (dcrs *DeviceCodeRequestStorage) Add(request OAuth2DeviceCodeRequest) error {

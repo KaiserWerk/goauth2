@@ -419,7 +419,7 @@ func (s *Server) HandleDeviceCodeAuthorizationRequest(w http.ResponseWriter, r *
 			Interval:                5,   // polling every 5 seconds is okay
 		},
 	}
-	if err := s.Storage.DeviceCodeRequestStorage.Add(req); err != nil {
+	if err := s.Storage.DeviceCodeRequestStorage.Add(&req); err != nil {
 		http.Error(w, "failed to store request", http.StatusInternalServerError)
 		return fmt.Errorf("failed to store request: %s", err.Error())
 	}
@@ -442,18 +442,8 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 	}
 	// user is certainly logged in from here on
 
-	// TODO handle client_id from request
-
 	if r.Method == http.MethodGet {
-		// TODO: set data!
-		data := struct {
-			Message         string
-			ApplicationName string
-		}{
-			Message:         "",
-			ApplicationName: "My Cool Test App",
-		}
-		if err := executeTemplate(w, s.Template.DeviceCode, data); err != nil {
+		if err := executeTemplate(w, s.Template.DeviceCode, nil); err != nil {
 			http.Error(w, "failed to find template", http.StatusNotFound)
 			return fmt.Errorf("failed to find template: %s", err.Error())
 		}
@@ -468,7 +458,7 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 		deviceRequest, err := s.Storage.DeviceCodeRequestStorage.Get(userCode)
 		if err != nil {
 			http.Error(w, "failed to find device code request", http.StatusNotFound)
-			return fmt.Errorf("failed to find device code request")
+			return fmt.Errorf("failed to find device code request: %s", err.Error())
 		}
 
 		accessToken, err := s.TokenGenerator.Generate(0)
@@ -495,7 +485,8 @@ func (s *Server) HandleDeviceCodeUserAuthorization(w http.ResponseWriter, r *htt
 	return nil
 }
 
-// HandleDeviceCodeTokenRequest exchanges a device code for an access token. This is step 3 of 3.
+// HandleDeviceCodeTokenRequest exchanges a device code for an access token.
+// This is step 3 of 3.
 func (s *Server) HandleDeviceCodeTokenRequest(w http.ResponseWriter, r *http.Request) error {
 	if r.Method != http.MethodPost {
 		http.Error(w, "disallowed method", http.StatusBadRequest)

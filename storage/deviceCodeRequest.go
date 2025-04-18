@@ -15,26 +15,26 @@ type DeviceCodeResponse struct {
 	Interval                uint64 `json:"interval"`
 }
 
-func (d DeviceCodeRequest) GetClientID() string {
+func (d *DeviceCodeRequest) GetClientID() string {
 	return d.ClientID
 }
 
-func (d DeviceCodeRequest) SetClientID(id string) {
+func (d *DeviceCodeRequest) SetClientID(id string) {
 	d.ClientID = id
 }
 
-func (d DeviceCodeRequest) GetResponse() DeviceCodeResponse {
+func (d *DeviceCodeRequest) GetResponse() DeviceCodeResponse {
 	return d.Response
 }
 
-func (d DeviceCodeRequest) SetResponse(response DeviceCodeResponse) {
+func (d *DeviceCodeRequest) SetResponse(response DeviceCodeResponse) {
 	d.Response = response
 }
 
-func (d DeviceCodeRequest) GetTokenResponse() Token {
+func (d *DeviceCodeRequest) GetTokenResponse() Token {
 	return d.TokenResponse
 }
 
-func (d DeviceCodeRequest) SetTokenResponse(token Token) {
+func (d *DeviceCodeRequest) SetTokenResponse(token Token) {
 	d.TokenResponse = token
 }
